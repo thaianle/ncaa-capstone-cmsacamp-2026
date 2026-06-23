@@ -1,0 +1,103 @@
+(Note that users running this script need to install the `cbbdata` package first, using instructions from [this link](https://github.com/andreweatherman/cbbdata).)
+
+Read the necessary libraries:
+
+```{r}
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+```
+
+Read the dataset retrieved directly from the `cbbdata` package, restricting our analysis to the 2021-22 to the 2024-25 season:
+
+(Based on an unofficial source, the `year` column represents the calendar year in which the season officially ends, such as `year == 2022` for the 2021-22 season.)
+
+```{r}
+df_2022 <- cbd_torvik_player_season(year = 2022)
+df_2023 <- cbd_torvik_player_season(year = 2023)
+df_2024 <- cbd_torvik_player_season(year = 2024)
+df_2025 <- cbd_torvik_player_season(year = 2025)
+
+df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
+df
+```
+
+#### 1. Dealing with null values
+
+Note the dataset's documentation [here](https://github.com/andreweatherman/cbbdata/blob/main/data/dictionary_torvik_player_season.csv).
+
+Check the null values in the dataset (worth investigating, as we may need to fill in or remove missing values later on):
+
+```{r}
+# # https://stackoverflow.com/questions/26273663/r-how-to-total-the-number-of-na-in-each-col-of-data-frame
+colSums(is.na(df))
+```
+
+There are a lot of missing values in `rec` (Recruit composite, 0-100) and `pick` (Draft pick). I suspect that they are normal because not every player is scouted by major scouting organizations to have a recruit composite, and just a small number of NCAA D-I player is drafted into NBA, the professional tournament.
+
+I will filter for a certain player over the years to check that the recruit composite stays with the player from early years until (near) graduation:
+
+```{r}
+df |>
+  filter(player == "A.J. Hoggard")
+```
+
+The number 748 appears a lot in some statistics such as `dunk_m, dunk_a, rim_m, rim_a, mid_m, mid_a` (where shots are taken). Are they all the same players?
+
+```{r}
+# https://stackoverflow.com/questions/33520854/filtering-data-frame-based-on-na-on-multiple-columns
+df |>
+  filter_at(vars(dunk_m, dunk_a, rim_m, rim_a, mid_m, mid_a),
+            all_vars(is.na(.)))
+```
+
+Yes, they are (exactly 748 observations)! The majority of them are not-so-good players with low number of games and minutes played.
+
+Players with unknown positions:
+
+```{r}
+df |>
+  filter(is.na(pos))
+```
+
+#### 2. Dealing with duplicate data
+
+Is an ID shared by multiple players?
+
+```{r}
+df |>
+  distinct(player, .keep_all = TRUE) |>
+  count(id) |>
+  arrange(desc(n))
+```
+
+```{r}
+# Can also filter for IDs = 72370, 75221, 75246, etc. to check further
+df |>
+  filter(id == 71088)
+```
+
+Technically yes - but "players" who share the same IDs are probably the same person's name with different spellings. This issue also shows that we need to search for specific players by their IDs, not by their names!
+
+In addition, can the same player name have multiple different IDs?
+
+```{r}
+df |>
+  distinct(id, .keep_all = TRUE) |>
+  count(player) |>
+  arrange(desc(n))
+```
+
+```{r}
+df |>
+  filter(player == "Jordan Jones")
+```
+
+Yes, there are, but I am somewhat confident that many players can share the same surname and given name combination.
+
+For example, there are indeed four different Jordan Jones as the dataset suggests, coming from four different schools:
+
+- [Jordan Jones (Marist University)](https://goredfoxes.com/sports/mens-basketball/roster/jordan-jones/13150)
+- [Jordan Jones (Cornell University)](https://cornellbigred.com/sports/mens-basketball/roster/jordan-jones/63240)
+- [Jordan Jones (Mercer University)](https://mercerbears.com/sports/mens-basketball/roster/jordan-jones/9595)
+- [Jordan Jones (Central Connecticut State University)](https://ccsubluedevils.com/sports/mbkb/2023-24/bios/jones_jordan_8ymf)

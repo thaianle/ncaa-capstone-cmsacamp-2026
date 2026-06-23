@@ -1,0 +1,154 @@
+```{r}
+# Read the dataset as usual
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+
+df_2022 <- cbd_torvik_player_season(year = 2022)
+df_2023 <- cbd_torvik_player_season(year = 2023)
+df_2024 <- cbd_torvik_player_season(year = 2024)
+df_2025 <- cbd_torvik_player_season(year = 2025)
+
+df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
+df
+```
+
+How many players have actually made a transfer?
+
+```{r}
+# Count the number of unique players by their ID
+df |> count(id)
+```
+
+```{r}
+df |>
+  count(id) |>
+  filter(n > 1)
+```
+
+Among 10435 unique players mentioned in the dataset, there are 5757 players who transferred from the 2021-2025 timeframe. Note that we have not yet covered players who actually had a transfer but outside of the time frame.
+
+For now, we will add the new `transferred` variable to our dataframe, which returns 0 if player has not made a transfer in their entire career in that particular time frame, and 1 otherwise.
+
+```{r}
+# Filter for player IDs who transferred
+# Note that player IDs stay constant throughout the years
+
+transferred_ids <- df |>
+  count(id) |>
+  filter(n > 1) |>
+  select(-n) |>
+  mutate(transferred = 1)
+
+transferred_ids
+```
+
+```{r}
+# Add this into the concatenated dataframe
+# https://www.r-bloggers.com/2022/06/replace-na-with-zero-in-r/
+
+df_enhanced <- df |>
+  left_join(transferred_ids, join_by(id)) |>
+  mutate(transferred = ifelse(is.na(transferred), 0, transferred))
+
+df_enhanced
+```
+
+```{r}
+# Additional sanity check for "transferred IDs" and not transferred
+df_enhanced |>
+  distinct(id, .keep_all = TRUE) |>
+  count(transferred)
+```
+
+#### 1. Plot the 1D and 2D distributions of variables
+
+Summarize all variables in the dataset:
+
+```{r}
+summary(df)
+```
+
+Many quantitative variables look very left-skewed! How about examining the skewness of each variable?
+
+```{r}
+# I will work on this later...
+
+# install.packages("e1071")
+#library(e1071)
+
+#df_enhanced |>
+  #select(-(player:conf), -year, -id, -pick, -transferred) |>
+  #pivot_longer(cols = everything(), names_to = "metric",
+               #values_to = "value") |>
+  #group_by(metric) |>
+  #summarize(skewness = skewness(df$metric))
+```
+
+
+I will plot the histogram of most quantitative variable indicators of player performance in this dataset, as some inference models ([like hypothesis testing in linear regression models](https://library.virginia.edu/data/articles/normality-assumption)) prefer normally distributed variables.
+
+```{r}
+# https://stackoverflow.com/questions/63334436/pivot-longer-on-all-columns
+df_enhanced |>
+  select(-(player:conf), -year, -id, -pick, -transferred) |>
+  select(1:20) |>
+  pivot_longer(cols = everything(), names_to = "metric",
+               values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+```{r}
+# Continue plotting for other relevant quantitative variables
+df_enhanced |>
+  select(-(player:conf), -year, -id, -pick, -transferred) |>
+  select(21:40) |>
+  pivot_longer(cols = everything(), names_to = "metric",
+               values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+```{r}
+# Continue plotting for other relevant quantitative variables
+# There are 55 quantitative variables in total
+df_enhanced |>
+  select(-(player:conf), -year, -id, -pick, -transferred) |>
+  select(41:55) |>
+  pivot_longer(cols = everything(), names_to = "metric",
+               values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+Check the correlation between relevant quantitative variables with a heat map:
+
+```{r}
+# https://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
+
+# install.packages(reshape2)
+library(reshape2)
+
+corr_matrix <- df_enhanced |>
+  select(-(player:conf), -year, -id, -pick, -transferred) |>
+  cor(use = "pairwise.complete.obs") |>
+  round(2) |>
+  melt() |>
+  # Highlight the correlations that are greater than 0.85 in absolute value
+  # (both positive and negative)
+  mutate(plot_value = ifelse(value > 0.85 | value < -0.85, value, NA))
+  
+corr_matrix
+```
+
+```{r}
+corr_matrix |>
+  ggplot(aes(x = Var1, y = Var2, fill = plot_value)) +
+  geom_tile()
+```
+
+This one looks messy, but things will clear up when we know which variables to include in our model. For now, there are some pairs of variables with high correlation.
