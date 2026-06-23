@@ -58,13 +58,15 @@ df_2025 <- cbd_torvik_player_season(year = 2025)
 df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
 
 #if team name is equal to the team name in the previous year
-transfer_df <- df |>
-  group_by(player) |>
-  filter(n_distinct(team) > 1) |>
-  ungroup()
 
-df <- df |>
-  mutate(has_transferred = player %in% transfer_df$player)
+#actually get rid of has_transffered its not really helpful
+#transfer_df <- df |>
+#  group_by(player) |>
+#  filter(n_distinct(team) > 1) |>
+#  ungroup()
+
+#df <- df |>
+#  mutate(has_transferred = player %in% transfer_df$player)
 
 #df <- df |>
 #  select(-is_transfer)
@@ -93,7 +95,44 @@ df <- df |>
                                  team != prev_team,
                                TRUE,
                                FALSE))
+#get these 3 in front of df just to see
+df <- df |>
+  relocate(changed_team)
+
+df <- df |>
+  relocate(prev_team)
+
+df <- df |>
+  relocate(prev_year)
+
+#format to long in order to get columns of same player and their total games played for the different years side by side
+# do i need this?
+# turns out the answer is yes i do
+# change player to id later since id is correct
+df <- df |>
+  mutate(prev_games = lag(g))
+
+df <- df |>
+  relocate(prev_games)
+
+long <- df |>
+  select(player, year, g, prev_games) |>
+  pivot_longer(
+    cols = c(g, prev_games),
+    names_to = "season",
+    values_to = "games"
+  )
+
+# this gives us bar chart of all of the games that all the transfer players played in
+# before and after their transfer
+long |>
+  filter(!is.na(games)) |>
+  ggplot(aes(x = season, y = games)) +
+  geom_col()
 
 
+# how do i get this but every transfer ever
+
+  
 
 
