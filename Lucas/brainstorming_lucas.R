@@ -1,4 +1,4 @@
-# capstone braining
+# capstone brainstorming
 
 #attempting the hoopR package
 #install.packages("hoopR")
@@ -116,7 +116,7 @@ df <- df |>
   relocate(prev_games)
 
 long <- df |>
-  select(player, year, g, prev_games) |>
+  select(id, year, g, prev_games) |>
   pivot_longer(
     cols = c(g, prev_games),
     names_to = "season",
@@ -133,6 +133,30 @@ long |>
 
 # how do i get this but every transfer ever
 
-  
+#who transfers?
+#how do transfer situations differ?
+#what happens after they transfer?
+
+# number of transferred players per year
+df |>
+  group_by(year) |>
+  summarise(sum(changed_team == TRUE))
+
+# conferences and their classification
+unique(df$conf)
+df <- df |>
+  mutate(conference_classification = case_when(
+    conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
+    conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
+    conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
+              "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
+              "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
+  ))
+
+
+
+
+
+
 
 
