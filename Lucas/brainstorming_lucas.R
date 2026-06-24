@@ -153,6 +153,44 @@ df <- df |>
               "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
   ))
 
+# bar graph for transfer players by conference
+df <- df |>
+  mutate(prev_conf_class = lag(conference_classification))
+
+df <- df |>
+  relocate(prev_conf_class)
+
+df <- df |>
+  mutate(prev_conf = lag(conf))
+
+df <- df |>
+  relocate(prev_conf)
+
+
+#conferences with most transfers out
+df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = fct_infreq(prev_conf), fill = prev_conf_class)) +
+  geom_bar() +
+  coord_flip()
+#SEC has the most transfers out 
+#for the most part, with obviously some variance, high-majors have a 
+#lot of transfers out, mid-majors have medium amount out, and 
+#low-majors have a low amount of transfers out
+
+#conferences with the most transfers in
+df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = fct_infreq(conf), fill = conference_classification)) +
+  geom_bar() +
+  coord_flip()
+#SEC has the most transfers in?
+#again, for the most part, with obviously some variance, high-majors have a 
+#lot of transfers in, mid-majors have medium amount in, and 
+#low-majors have a low amount of transfers in
+
+# positions
+unique(df$pos)
 
 
 
