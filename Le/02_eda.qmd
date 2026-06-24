@@ -72,21 +72,11 @@ summary(df)
 Many quantitative variables look very left-skewed! How about examining the skewness of each variable?
 
 ```{r}
-# I will work on this later...
-
-# install.packages("e1071")
-#library(e1071)
-
-#df_enhanced |>
-  #select(-(player:conf), -year, -id, -pick, -transferred) |>
-  #pivot_longer(cols = everything(), names_to = "metric",
-               #values_to = "value") |>
-  #group_by(metric) |>
-  #summarize(skewness = skewness(df$metric))
+# I will compute them quantitatively later...
 ```
 
 
-I will plot the histogram of most quantitative variable indicators of player performance in this dataset, as some inference models ([like hypothesis testing in linear regression models](https://library.virginia.edu/data/articles/normality-assumption)) prefer normally distributed variables.
+I will plot the histogram of most quantitative variable indicators of player performance in this dataset, as some inferece models ([like hypothesis testing in linear regression models](https://library.virginia.edu/data/articles/normality-assumption)) prefer normally distributed variables.
 
 ```{r}
 # https://stackoverflow.com/questions/63334436/pivot-longer-on-all-columns
@@ -125,30 +115,6 @@ df_enhanced |>
   facet_wrap(~ metric, scales = "free")
 ```
 
-Check the correlation between relevant quantitative variables with a heat map:
+Future work:
 
-```{r}
-# https://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
-
-# install.packages(reshape2)
-library(reshape2)
-
-corr_matrix <- df_enhanced |>
-  select(-(player:conf), -year, -id, -pick, -transferred) |>
-  cor(use = "pairwise.complete.obs") |>
-  round(2) |>
-  melt() |>
-  # Highlight the correlations that are greater than 0.85 in absolute value
-  # (both positive and negative)
-  mutate(plot_value = ifelse(value > 0.85 | value < -0.85, value, NA))
-  
-corr_matrix
-```
-
-```{r}
-corr_matrix |>
-  ggplot(aes(x = Var1, y = Var2, fill = plot_value)) +
-  geom_tile()
-```
-
-This one looks messy, but things will clear up when we know which variables to include in our model. For now, there are some pairs of variables with high correlation.
+- Check the correlation between variables with a heat map
