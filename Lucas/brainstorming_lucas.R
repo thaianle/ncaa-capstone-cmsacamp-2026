@@ -19,7 +19,7 @@
 
 #install.packages("xml2", type = "source")
 #install.packages("curl", type = "both")
-#library(devtools)
+library(devtools)
 
 # 1. Install a stable version of httr2 that bypasses this bug
 #devtools::install_version("httr2", version = "1.1.0", upgrade = "never", force = TRUE)
@@ -42,8 +42,9 @@ cbbdata::cbd_login()
 
 #start here
 library(cbbdata)
-library(dplyr)
 library(ggplot2)
+library(tidyverse)
+library(scales)
 
 
 #code thanks to An!
@@ -191,10 +192,72 @@ df |>
 
 # positions
 unique(df$pos)
+# positions that transfer the most
+df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = pos)) +
+  geom_bar()
+# pure PG transfer the least (teams value what they bring to the table)
+# wing G transfer the most (this position is kind of a combination between shooting G and SF)
 
+# which class year is the most popular to transfer 
 
+#find previous year like what class they were before the transfer happened
+df <- df |>
+  mutate(prev_class = lag(exp))
 
+df <- df |>
+  relocate(prev_class)
 
+df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = prev_class)) +
+  geom_bar()
+# most people transfer after their junior year 
+# note: super senior status due to red shirt
+
+# total athletes mpg before and after transferring
+# get previous minutes per game
+df <- df |>
+  mutate(prev_mpg = lag(mpg))
+
+df <- df |>
+  relocate(prev_mpg)
+df<- df|>
+  relocate(mpg)
+
+df |>
+  filter(changed_team == TRUE)
+
+long2 <- df |>
+  select(id, year, mpg, prev_mpg) |>
+  pivot_longer(
+    cols = c(mpg, prev_mpg),
+    names_to = "season",
+    values_to = "mpg"
+  )
+
+long2 |>
+  filter(!is.na(mpg)) |>
+  ggplot(aes(x = season, y = mpg)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma)
+# people have more minutes per game after transferring
+
+# ok big fish little pond
+df |>
+  filter(changed_team == TRUE & 
+           (prev_conf_class == "mid-major" | prev_conf_class == "low-major") &
+           conference_classification == "high-major") |>
+  group_by(id) |>
+  summarise(med_mpg = median(mpg),
+            med_prev_mpg = median(prev_mpg)) 
+select(id, mpg, prev_mpg) |>
+  pivot_longer(
+    cols = c(mpg, prev_mpg),
+    names_to = "season",
+    values_to = "mpg"
+  ) 
 
 
 
