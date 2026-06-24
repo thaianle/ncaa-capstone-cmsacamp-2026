@@ -1,0 +1,176 @@
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+
+df <- read.csv("player_stats.csv")
+df
+```
+
+#### 1. Plot the 1D and 2D distributions of variables
+
+Summarize all variables in the dataset:
+
+```{r}
+summary(df)
+```
+
+Many quantitative variables look very left-skewed! How about examining the skewness of each variable?
+
+```{r}
+# I will compute them quantitatively later...
+```
+
+
+I will plot the histogram of most quantitative variable indicators of player performance in this dataset, as some inferece models ([like hypothesis testing in linear regression models](https://library.virginia.edu/data/articles/normality-assumption)) prefer normally distributed variables.
+
+```{r}
+quantitative_df <- df |>
+  select(-(player:conf), -year, -id, -pick, -has_transferred, -prev_team,
+         -prev_year, -changed_team)
+
+quantitative_df
+```
+
+
+```{r}
+# https://stackoverflow.com/questions/63334436/pivot-longer-on-all-columns
+quantitative_df |>
+  select(1:20) |>
+  pivot_longer(cols = everything(), names_to = "metric",
+               values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+```{r}
+# Continue plotting for other relevant quantitative variables
+quantitative_df |>
+  select(21:40) |>
+  pivot_longer(cols = everything(), names_to = "metric",
+               values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+```{r}
+# Continue plotting for other relevant quantitative variables
+# There are 55 quantitative variables in total
+quantitative_df |>
+  select(41:55) |>
+  pivot_longer(cols = everything(), names_to = "metric",
+               values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+Check the correlation between relevant quantitative variables with a heat map:
+
+```{r}
+# https://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
+
+# install.packages(reshape2)
+library(reshape2)
+
+corr_matrix <- quantitative_df |>
+  cor(use = "pairwise.complete.obs") |>
+  round(2) |>
+  melt() |>
+  # Highlight the correlations that are greater than 0.85 in absolute value
+  # (both positive and negative)
+  mutate(plot_value = ifelse(value > 0.85 | value < -0.85, value, NA))
+  
+corr_matrix
+```
+
+```{r}
+corr_matrix |>
+  ggplot(aes(x = Var1, y = Var2, fill = plot_value)) +
+  geom_tile()
+```
+
+This one looks messy, but things will clear up when we know which variables to include in our model. For now, there are some pairs of variables with high correlation.
+
+#### 2. Explore differences in player metrics based on their transfer status
+
+As a refresher, the documentation for the original dataset, `torvik_player_season`, can be found [here](https://github.com/andreweatherman/cbbdata/blob/main/data/dictionary_torvik_player_season.csv).
+
+Comparing players who have transferred in their careers and players who do not:
+
+```{r}
+# Note that we have removed some NA values to properly display the results
+df |>
+  select(g, min, mpg, ppg, has_transferred) |>
+  group_by(has_transferred) |>
+  summarize(median_g = median(g, na.rm = TRUE),
+            median_min = median(min, na.rm = TRUE),
+            median_mpg = median(mpg, na.rm = TRUE),
+            median_ppg = median(ppg, na.rm = TRUE)) |>
+  pivot_longer(median_g:median_ppg, names_to = "metric", values_to = "value") |>
+  ggplot(aes(x = has_transferred, y = value)) +
+  geom_col() + coord_flip() +
+  scale_x_continuous(breaks = seq(0, 1, 1)) +
+  facet_wrap(~ metric, scales = "free")
+```
+
+Are these differences statistically significant? Perhaps we can use a statistical test later...
+
+```{r}
+# Add code to perform the statistical test here
+```
+
+[MORE COMING SOON]
+
+#### 3. Explore the transferring data for teams and conferences
+
+Which specific team has the most number of transfer-ins and transfer-outs during the 2021-25 periods and for each season?
+
+(Note that we do not have data outside of the 2021-25 range. The transfer-ins data starts from the 2022-23 season and the transfer-outs data ends at the 2023-24 season.)
+
+```{r}
+# Filter the dataset to only obtain athletes' first year after transfer
+transfer_ins <- df |>
+  filter(changed_team == 1) |>
+  select(team, year)
+
+transfer_ins
+```
+
+```{r}
+# Teams with the most transfer-ins each year
+transfer_ins |>
+  group_by(team, year) |>
+  count(team) |>
+  ungroup() |>
+  group_by(year) |>
+  slice_max(n, n = 10) |>
+  ggplot(aes(x = n, y = fct_reorder(team, n))) +
+  geom_col() + facet_wrap(~ year, scales = "free_x")
+```
+
+What about the teams which have the most players transferring out?
+
+```{r}
+df |>
+  filter(changed_team == 1) |>
+  select(prev_team, prev_year) |>
+  group_by(prev_team, prev_year) |>
+  count(prev_team) |>
+  ungroup() |>
+  group_by(prev_year) |>
+  slice_max(n, n = 5) |>
+  ggplot(aes(x = n, y = fct_reorder(prev_team, n))) +
+  geom_col() + facet_wrap(~ prev_year, scales = "free_x")
+```
+
+In the presentation, we might link these EDA graph's result to management or coaching changes. Additional research is needed to confirm if that is the case.
+
+[MORE COMING SOON]
+
+#### 4. Explore the general developments of player statistics over time ("time trends")
+
+[COMING SOON]

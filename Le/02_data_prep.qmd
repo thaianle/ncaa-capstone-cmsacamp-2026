@@ -1,0 +1,90 @@
+```{r}
+# Read the dataset as usual
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+
+df_2022 <- cbd_torvik_player_season(year = 2022)
+df_2023 <- cbd_torvik_player_season(year = 2023)
+df_2024 <- cbd_torvik_player_season(year = 2024)
+df_2025 <- cbd_torvik_player_season(year = 2025)
+
+df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
+df
+```
+
+Kendall helped me with the code for the `has_transferred` and `changed_team` variables!
+
+```{r}
+# Exploring Kendall's code (adjusted to group by player IDs instead of player names)
+
+transfer_df <- df |>
+  group_by(id) |>
+  filter(n_distinct(team) > 1) |>
+  ungroup()
+
+transfer_df
+```
+
+```{r}
+# Whether a player has transferred - make it a binary variable for easier coding
+df_enhanced <- df |>
+  mutate(has_transferred = ifelse(id %in% transfer_df$id, 1, 0))
+
+df_enhanced
+```
+
+
+```{r}
+# trying to make transfer out year/transfer in year
+# changed_team is the first year after transfer
+df_enhanced <- df_enhanced |>
+  arrange(id, year) |>
+  group_by(id) |>
+  mutate(prev_team = lag(team),
+         prev_year = lag(year),
+         #if they have a previous team AND 
+         #the year is the one right after the previous year AND 
+         #the team they're on is not the same as the previous team THEN
+         #changed_team is through IF NOT THEN
+         #changed_team is false 
+         changed_team = ifelse(!is.na(prev_team) &
+                                 year == (prev_year + 1) &
+                                 team != prev_team,
+                               1,
+                               0))
+
+df_enhanced
+```
+
+Filling in the experience level for the remaining players:
+- Jason Umosella (La Salle University): Freshman (as of 2024-25) ([link](https://goexplorers.com/sports/mens-basketball/roster/jason-umosella/12302))
+- Fedor Zugic (Creighton University): Sophomore (as of 2024-25) ([link](https://gocreighton.com/sports/mens-basketball/roster/fedor-zcaronugi/8569))
+
+```{r}
+df_enhanced |>
+  filter(!(exp %in% c("Fr", "So", "Jr", "Sr")))
+```
+
+```{r}
+df_enhanced <- df_enhanced |>
+  mutate(exp = case_when(
+    player == "Jason Umosella" ~ "Fr",
+    player == "Fedor Zugic" ~ "So",
+    TRUE ~ exp
+  ))
+
+df_enhanced
+```
+
+```{r}
+# Checking that the data preparation works
+df_enhanced |>
+  filter(player %in% c("Jason Umosella", "Fedor Zugic"))
+```
+
+Finally, I will export the dataframe to a CSV file for later use (This should not be pushed into a public GitHub repo):
+
+```{r}
+write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
+```

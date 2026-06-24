@@ -1,0 +1,80 @@
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+
+df <- read.csv("player_stats.csv")
+df
+```
+
+```{r}
+# Cast the "numeric" variables (id and year) into factor for more convenient modeling
+df <- df |>
+  mutate(id = as.factor(id),
+         year = as.factor(year))
+
+df
+```
+
+My modeling approach is inspired from [this website](https://www.tilburgsciencehub.com/topics/analyze/causal-inference/did/canonical-did-regression/), which contains a brief description of how to implement difference-in-differences (DiD) in R.
+
+```{r}
+# Most simple baseline model, using points per game (ppg) as an example metric
+baseline_lm <- lm(ppg ~ changed_team, data = df)
+summary(baseline_lm)
+```
+
+```{r}
+# Fixed effects model
+# install.packages("fixest")
+library(fixest)
+fe_model <- feols(ppg ~ changed_team | year, data = df)
+fe_model
+```
+
+
+```{r}
+# Now let's add the near-DiD set up without the 2-way fixed effects
+near_did_lm <- lm(ppg ~ has_transferred + changed_team
+                  + has_transferred*changed_team,
+                  data = df)
+summary(near_did_lm)
+```
+
+```{r}
+cor(df$has_transferred*df$changed_team, df$changed_team)
+```
+
+Note the error "1 not defined because of singularities". There is currently a problem with implementing DiD in this case. We have created two indicator variables:
+
+- The group indicator variable (has not transferred in career vs. has transferred)
+- The treatment indicator variable (before transfer vs. first year after transfer)
+
+This might contribute to the perfect collinearity issue! (once we see `has_transferred == 0`, we can also conclude that `changed_team == 0`.)
+
+[Future work] Another path to address the perfect collinearity: Set the `has_transferred` variable to be `1` only when the player has made their first transfer, and `0` otherwise.
+
+#### Additional control variables to consider in the model
+
+Some confounding variables (the best that we can find) in the dataset to model the relationship between transferring (`changed_team`) and athletic performance:
+
+- Experience level (freshman, sophomore, junior, senior)
+- Differences in ratings or results between destination team and original team
+- The same differences but between destination and original conferences
+- Postion (well there are many crazy values here)
+- Whether they are good or bad within the current team
+
+Other control variables that we might include:
+
+- NIL (the one we all know but currently do not have sufficient data)
+
+```{r}
+# Note that the effect of `changed_team` has changed dramatically when we added the position into the model
+
+improved_fe_model <- feols(ppg ~ changed_team | id + year,
+                           data = df)
+improved_fe_model
+```
+
+(Currently having a singleton issue associated with the model if we use the student fixed effect `id`)
