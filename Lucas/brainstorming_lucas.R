@@ -253,8 +253,26 @@ long2 |>
 #how about histogram?
 long2 |>
   filter(!is.na(mpg)) |>
+  ggplot(aes(x = mpg)) +
+  geom_histogram() +
+  facet_wrap("season")
+
+#density plot?
+long2 |>
+  filter(!is.na(mpg)) |>
   ggplot(aes(x = mpg, fill = season)) +
-  geom_histogram()
+  geom_density()
+
+#plotting it x vs y
+df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = prev_mpg, y = mpg)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5)
+#if a player had less that ~22 minutes per game, on average, they recieved more 
+#minutes after their transfer, however, if a player had more than 22 minutes,
+#on average, they recieved less playing time at the school they transferred to 
 
 # ok big fish little pond
 #df |>
@@ -317,6 +335,67 @@ little_pond_df |>
 # players that transfer from big to small schools,
 # the median minutes per game increases
 
+#what about ppg
+df <- df |>
+  mutate(prev_ppg = lag(ppg))
+
+
+long_ppg <- df |>
+  select(id, year, ppg, prev_ppg) |>
+  pivot_longer(
+    cols = c(ppg, prev_ppg),
+    names_to = "season",
+    values_to = "ppg"
+  )
+
+long_ppg |>
+  filter(!is.na(ppg)) |>
+  ggplot(aes(x = season, y = ppg)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma)
+
+#what about a boxplot?
+long_ppg |>
+  filter(!is.na(ppg)) |>
+  ggplot(aes(x = ppg, y = season)) +
+  geom_boxplot()
+
+#how about histogram?
+long_ppg |>
+  filter(!is.na(ppg)) |>
+  ggplot(aes(x = ppg)) +
+  geom_histogram() +
+  facet_wrap("season")
+
+#density plot?
+long_ppg |>
+  filter(!is.na(ppg)) |>
+  ggplot(aes(x = ppg, fill = season)) +
+  geom_density()
+
+#plotting it x vs y
+df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = prev_ppg, y = ppg)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5)
+#if a player had less that ~7-8 points per game, on average, they received more 
+#points per game after their transfer, however, if a player had more than 7-8 points per game,
+#on average, they received less points per game time at the school they transferred to 
+
+# hierarchical clustering
+# potential features: mpg, ppg, fgp, stl, blk, to, ast, rebound?, block?, 
+# adj de/of rating, 
+
+
+
+
+
+
+# success by position
+# success relative to those in the same position
+# RAPM?
 
 
 
