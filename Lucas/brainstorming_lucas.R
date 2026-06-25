@@ -244,20 +244,85 @@ long2 |>
   scale_y_continuous(labels = scales::comma)
 # people have more minutes per game after transferring
 
+#what about a boxplot?
+long2 |>
+  filter(!is.na(mpg)) |>
+  ggplot(aes(x = mpg, y = season)) +
+  geom_boxplot()
+
+#how about histogram?
+long2 |>
+  filter(!is.na(mpg)) |>
+  ggplot(aes(x = mpg, fill = season)) +
+  geom_histogram()
+
 # ok big fish little pond
-df |>
+#df |>
+#  filter(changed_team == TRUE & 
+#           (prev_conf_class == "mid-major" | prev_conf_class == "low-major") &
+#           conference_classification == "high-major") |>
+#  group_by(id) |>
+#  summarise(med_mpg = median(mpg),
+#            med_prev_mpg = median(prev_mpg)) 
+#select(id, mpg, prev_mpg) |>
+#  pivot_longer(
+#    cols = c(mpg, prev_mpg),
+#    names_to = "season",
+#    values_to = "mpg"
+#  ) 
+
+
+median_df <- df |>
   filter(changed_team == TRUE & 
            (prev_conf_class == "mid-major" | prev_conf_class == "low-major") &
            conference_classification == "high-major") |>
-  group_by(id) |>
-  summarise(med_mpg = median(mpg),
-            med_prev_mpg = median(prev_mpg)) 
-select(id, mpg, prev_mpg) |>
-  pivot_longer(
-    cols = c(mpg, prev_mpg),
-    names_to = "season",
-    values_to = "mpg"
-  ) 
+  mutate(mpg = as.numeric(mpg),
+         prev_mpg = as.numeric(prev_mpg))
+
+
+big_pond_median_current <- median(median_df$mpg)
+big_pond_median_before <- median(median_df$prev_mpg)
+
+big_pond_df <- data.frame(
+  category = c("minutes_before_transfer", "minutes_after_transfer"),
+  values = c(big_pond_median_before, big_pond_median_current)
+) 
+
+
+big_pond_df |>
+  ggplot(aes(x = reorder(category, -values), y = values)) +
+  geom_col()
+# for players who transfer from a smaller program to a bigger one,
+# the median minutes per game drops drastically
+
+# what about the other way around?
+other_median_df <- df |>
+  filter(changed_team == TRUE & 
+           (conference_classification == "mid-major" | conference_classification == "low-major") &
+           prev_conf_class == "high-major") |>
+  mutate(mpg = as.numeric(mpg),
+         prev_mpg = as.numeric(prev_mpg))
+
+little_pond_median_current <- median(other_median_df$mpg)
+little_pond_median_before <- median(other_median_df$prev_mpg)
+
+little_pond_df <- data.frame(
+  category = c("minutes_before_transfer", "minutes_after_transfer"),
+  values = c(little_pond_median_before, little_pond_median_current)
+) 
+
+little_pond_df |>
+  ggplot(aes(x = reorder(category, values), y = values)) +
+  geom_col()
+# players that transfer from big to small schools,
+# the median minutes per game increases
+
+
+
+
+
+
+
 
 
 
