@@ -3,6 +3,7 @@
 rm(list = ls()) # Clear the environment
 library(tidyverse)
 library(cbbdata)
+library(broom)
 
 df <- read.csv("player_stats.csv")
 df
@@ -16,6 +17,8 @@ df <- df |>
 
 df
 ```
+
+#### 1. Basic linear regression and diff-in-diff set-up
 
 My modeling approach is inspired from [this website](https://www.tilburgsciencehub.com/topics/analyze/causal-inference/did/canonical-did-regression/), which contains a brief description of how to implement difference-in-differences (DiD) in R.
 
@@ -32,7 +35,6 @@ library(fixest)
 fe_model <- feols(ppg ~ changed_team | year, data = df)
 fe_model
 ```
-
 
 ```{r}
 # Now let's add the near-DiD set up without the 2-way fixed effects
@@ -54,6 +56,106 @@ Note the error "1 not defined because of singularities". There is currently a pr
 This might contribute to the perfect collinearity issue! (once we see `has_transferred == 0`, we can also conclude that `changed_team == 0`.)
 
 [Future work] Another path to address the perfect collinearity: Set the `has_transferred` variable to be `1` only when the player has made their first transfer, and `0` otherwise.
+
+#### 2. Isolating the diff-in-diff by transferring times (eg: junior/senior year)
+
+I will run a DiD model filtered by the incoming transferring experience level, without any additional fixed effects or control variables.
+
+```{r}
+# Sample: DiD with players transferring in their senior year
+near_did_sr <- lm(ppg ~ transfer_incoming_sr + changed_team
+                  + transfer_incoming_sr*changed_team,
+                  data = df)
+tidy(near_did_sr, conf.int = TRUE)
+```
+
+```{r}
+near_did_so <- lm(ppg ~ transfer_incoming_so + changed_team
+                  + transfer_incoming_so*changed_team,
+                  data = df)
+tidy(near_did_so, conf.int = TRUE)
+```
+
+```{r}
+# Report multiple regression model results at a time in a concise table
+# https://libguides.princeton.edu/R-stargazer
+# install.packages("stargazer")
+library(stargazer)
+
+near_did_fr <- lm(ppg ~ transfer_incoming_fr + changed_team
+                  + transfer_incoming_fr*changed_team,
+                  data = df)
+
+near_did_so <- lm(ppg ~ transfer_incoming_so + changed_team
+                  + transfer_incoming_so*changed_team,
+                  data = df)
+
+near_did_jr <- lm(ppg ~ transfer_incoming_jr + changed_team
+                  + transfer_incoming_jr*changed_team,
+                  data = df)
+
+near_did_sr <- lm(ppg ~ transfer_incoming_sr + changed_team
+                  + transfer_incoming_sr*changed_team,
+                  data = df)
+
+stargazer(near_did_fr, near_did_so, near_did_jr, near_did_sr, type = "text")
+```
+
+What about using another package, `modelsummary`? ([link](https://www.tilburgsciencehub.com/topics/visualization/data-visualization/regression-results/model-summary/))
+
+```{r}
+# install.packages("modelsummary")
+library(modelsummary)
+
+models <- list(
+  "(1)" = near_did_fr,
+  "(2)" = near_did_so,
+  "(3)" = near_did_jr,
+  "(4)" = near_did_sr
+)
+
+# stars = TRUE: add stars (***) to denote statistical significance
+msummary(models, stars = TRUE)
+```
+
+Adding fixed effects with regard to team and season (year), along with control variables:
+
+```{r}
+library(fixest)
+
+near_did_fr_2 <- feols(ppg ~ changed_team + pos
+                       + transfer_incoming_fr
+                       + transfer_incoming_fr*changed_team
+                       | team + year,
+                  data = df)
+
+near_did_so_2 <- feols(ppg ~ changed_team + pos
+                       + transfer_incoming_so
+                       + transfer_incoming_so*changed_team
+                       | team + year,
+                  data = df)
+
+near_did_jr_2 <- feols(ppg ~ changed_team + pos
+                       + transfer_incoming_jr
+                       + transfer_incoming_jr*changed_team
+                       | team + year,
+                  data = df)
+
+near_did_sr_2 <- feols(ppg ~ changed_team + pos
+                       + transfer_incoming_sr
+                       + transfer_incoming_sr*changed_team
+                       | team + year,
+                  data = df)
+
+models_2 <- list(
+  "(1)" = near_did_fr_2,
+  "(2)" = near_did_so_2,
+  "(3)" = near_did_jr_2,
+  "(4)" = near_did_sr_2
+)
+
+msummary(models_2, stars = TRUE)
+```
 
 #### Additional control variables to consider in the model
 

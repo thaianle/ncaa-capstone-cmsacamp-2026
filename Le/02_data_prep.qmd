@@ -83,6 +83,86 @@ df_enhanced |>
   filter(player %in% c("Jason Umosella", "Fedor Zugic"))
 ```
 
+Update the conference classification and previous conference to the dataset (code by Kendall):
+
+```{r}
+df_enhanced <- df_enhanced |>
+  mutate(conference_classification = case_when(
+    conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
+    conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
+    conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
+              "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
+              "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
+  ))
+```
+
+```{r}
+# bar graph for transfer players by conference
+df_enhanced <- df_enhanced |>
+  mutate(prev_conf_class = lag(conference_classification))
+
+df_enhanced <- df_enhanced |>
+  relocate(prev_conf_class)
+
+df_enhanced <- df_enhanced |>
+  mutate(prev_conf = lag(conf))
+
+df_enhanced <- df_enhanced |>
+  relocate(prev_conf)
+```
+
+Create new "transfer incoming year" variables to better fit the diff-in-diff modeling:
+
+```{r}
+incoming_freshman_ids <- df_enhanced |>
+  filter(changed_team == 1 & exp == "Fr") |>
+  distinct(id) |>
+  mutate(transfer_incoming_fr = 1)
+
+incoming_sophomore_ids <- df_enhanced |>
+  filter(changed_team == 1 & exp == "So") |>
+  distinct(id) |>
+  mutate(transfer_incoming_so = 1)
+
+incoming_junior_ids <- df_enhanced |>
+  filter(changed_team == 1 & exp == "Jr") |>
+  distinct(id) |>
+  mutate(transfer_incoming_jr = 1)
+
+incoming_senior_ids <- df_enhanced |>
+  filter(changed_team == 1 & exp == "Sr") |>
+  distinct(id) |>
+  mutate(transfer_incoming_sr = 1)
+
+incoming_freshman_ids
+incoming_sophomore_ids
+incoming_junior_ids
+incoming_senior_ids
+```
+
+Now rejoin these columns back into the dataset and fill in the NA values:
+
+```{r}
+# https://tidyr.tidyverse.org/reference/replace_na.html
+
+df_enhanced <- df_enhanced |>
+  left_join(incoming_freshman_ids, join_by(id)) |>
+  left_join(incoming_sophomore_ids, join_by(id)) |>
+  left_join(incoming_junior_ids, join_by(id)) |>
+  left_join(incoming_senior_ids, join_by(id)) |>
+  # Replace the NA values (for columns not present in the "right" table) with 0
+  mutate(transfer_incoming_fr = replace_na(transfer_incoming_fr, 0),
+         transfer_incoming_so = replace_na(transfer_incoming_so, 0),
+         transfer_incoming_jr = replace_na(transfer_incoming_jr, 0),
+         transfer_incoming_sr = replace_na(transfer_incoming_sr, 0))
+  
+```
+
+```{r}
+df_enhanced
+```
+
+
 Finally, I will export the dataframe to a CSV file for later use (This should not be pushed into a public GitHub repo):
 
 ```{r}
