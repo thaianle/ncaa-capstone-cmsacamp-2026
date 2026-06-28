@@ -40,11 +40,22 @@ devtools::install_github("andreweatherman/cbbdata")
 # persistent log-in
 cbbdata::cbd_login()
 
+#install.packages(c("tseries", "FactoMineR"), dependencies = TRUE)
+
+#install.packages("factoextra", dependencies = TRUE)
+
+#install.packages("factoextra", type = "binary")
+
+#install.packages("FactoMineR")
+
 #start here
 library(cbbdata)
 library(ggplot2)
 library(tidyverse)
 library(scales)
+library(factoextra)
+library(FactoMineR)
+library(plotly)
 
 
 #code thanks to An!
@@ -95,7 +106,8 @@ df <- df |>
                                  year == (prev_year + 1) &
                                  team != prev_team,
                                TRUE,
-                               FALSE))
+                               FALSE)) |>
+  ungroup()
 #get these 3 in front of df just to see
 df <- df |>
   relocate(changed_team)
@@ -384,13 +396,99 @@ df |>
 #points per game after their transfer, however, if a player had more than 7-8 points per game,
 #on average, they received less points per game time at the school they transferred to 
 
-# hierarchical clustering
-# potential features: mpg, ppg, fgp, stl, blk, to, ast, rebound?, block?, 
-# adj de/of rating, 
+# kmeans clustering
+# potential features: mpg, ppg, rpg, apg, tov, spg, efg, fgp, stl, blk, to, ast, rebound?, block?, 
+# adj de/of rating, two_pct, three_pct, dunk_pct
 
 
+ player_performance_df <- df |>
+   select(mpg, ppg, rpg, apg, tov, spg, efg, fg_pct, stl, blk, two_pct, three_pct,
+          dunk_pct, adj_oe, adj_de, changed_team) |>
+   drop_na(mpg, ppg, rpg, apg, tov, spg, efg, fg_pct, stl, blk, two_pct, three_pct,
+           dunk_pct, adj_oe, adj_de, changed_team) 
+ 
+ player_performance_feat <- player_performance_df |>
+   select(-changed_team) 
+ 
+ player_performance_pca <- prcomp(player_performance_feat, center = TRUE, scale. = TRUE)
+ summary(player_performance_pca)
+ 
+ player_performance_pc_matrix <- player_performance_pca$x
+ 
+ head(as.data.frame(player_performance_pc_matrix))
+ 
+ #cov(player_performance_pc_matrix)
+ 
+ as.data.frame(player_performance_pca$rotation) |> rownames_to_column("statistic")
+ 
+ 
+ player_performance_stats_pca <- player_performance_df |> 
+   mutate(pc1 = player_performance_pc_matrix[,1], 
+          pc2 = player_performance_pc_matrix[,2],
+          pc3 = player_performance_pc_matrix[,3])
+ 
+ player_performance_stats_pca |> 
+   ggplot(aes(x = pc1, y = pc2)) +
+   geom_point(alpha = 0.5) +
+   labs(x = "PC1 (31.65%) ", y = "PC2 (21.07%)")
 
+ 
+# fviz_pca_var(): projection of variables
+# fviz_pca_ind(): display observations with first two PCs
+ player_performance_pca |> 
+   fviz_pca_biplot(label = "var",
+                   alpha.ind = 0.25,
+                   alpha.var = 0.75,
+                   labelsize = 5,
+                   col.var = "red",
+                   repel = TRUE)
 
+ 
+ player_performance_pca |> 
+   fviz_eig(addlabels = TRUE) +
+   geom_hline(
+     yintercept = 100 * (1 / ncol(player_performance_pca$x)), 
+     linetype = "dashed", 
+     color = "darkred",
+   )
+ 
+ player_performance_pc_data <- player_performance_pca$x[, 1:3]
+ 
+ fviz_nbclust(player_performance_pc_data, kmeans, method = "wss")
+
+set.seed(1234)
+ 
+ km <- km <- kmeans(player_performance_pc_data, centers = 4, nstart = 25)
+ 
+ player_performance_stats_pca <- player_performance_stats_pca |>
+   mutate(cluster = factor(km$cluster))
+
+ colnames(player_performance_stats_pca)
+
+transfers <- player_performance_stats_pca |>
+  filter(changed_team == 1)
+ 
+non_transfers <- player_performance_stats_pca |>
+  filter(changed_team == 0) 
+ 
+#non-transfers
+plot_ly(
+   data = non_transfers,
+   x = ~pc1,
+   y = ~pc2,
+   z = ~player_performance_pca$x[,3],
+   color = ~cluster, 
+   type = "scatter3d",
+   mode = "markers"
+ )
+
+# elbow around 3 component
+# while the red horizontal line says around 6 components is optimal
+# if we want to visualize, we can only use 2-3 components
+# however, pcs 1, 2, and 3 explain 62.4 percent of the variance
+# which is still a decent level
+
+# An advised to try kmeans instead of hierarchical because of the number of observations
 
 
 # success by position
