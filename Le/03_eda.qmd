@@ -27,8 +27,7 @@ I will plot the histogram of most quantitative variable indicators of player per
 
 ```{r}
 quantitative_df <- df |>
-  select(-(player:conf), -year, -id, -pick, -has_transferred, -prev_team,
-         -prev_year, -changed_team)
+  select(where(is.numeric))
 
 quantitative_df
 ```
@@ -58,9 +57,8 @@ quantitative_df |>
 
 ```{r}
 # Continue plotting for other relevant quantitative variables
-# There are 55 quantitative variables in total
 quantitative_df |>
-  select(41:55) |>
+  select(41:60) |>
   pivot_longer(cols = everything(), names_to = "metric",
                values_to = "value") |>
   ggplot(aes(x = value)) +
@@ -173,4 +171,55 @@ In the presentation, we might link these EDA graph's result to management or coa
 
 #### 4. Explore the general developments of player statistics over time ("time trends")
 
-[COMING SOON]
+As a simple metric, I will compare the median points per game of players in freshman, sophomore, junior, and senior years, grouped by different metrics.
+
+First, comparing between players who have transferred at least once in their career, and players who have not:
+
+```{r}
+# https://www.r-bloggers.com/2024/06/how-to-avoid-empty-line-charts/
+
+df |>
+  select(exp, has_transferred, ppg) |>
+  group_by(exp, has_transferred) |>
+  summarize(mean_ppg = mean(ppg, na.rm = TRUE)) |>
+  mutate(exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr"))) |>
+  ggplot(aes(x = exp, y = mean_ppg, color = as.factor(has_transferred))) +
+  geom_point() + geom_line(aes(group = has_transferred))
+```
+
+What about players of the same experience level (freshman up to senior), who have just transferred into a new team?
+
+```{r}
+df |>
+  select(exp, changed_team, ppg) |>
+  group_by(exp, changed_team) |>
+  summarize(mean_ppg = mean(ppg, na.rm = TRUE)) |>
+  mutate(exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr"))) |>
+  ggplot(aes(x = exp, y = mean_ppg, color = as.factor(changed_team))) +
+  geom_point() + geom_line(aes(group = changed_team))
+```
+
+How about combining these plots together?
+
+```{r}
+df |>
+  select(exp, has_transferred, changed_team, cumulative_career_transfers, ppg) |>
+  mutate(first_transfer_made = ifelse(cumulative_career_transfers > 0, 1, 0)) |>
+  select(-cumulative_career_transfers) |>
+  
+  group_by(exp, has_transferred, changed_team, first_transfer_made) |>
+  summarize(mean_ppg = mean(ppg, na.rm = TRUE)) |>
+  
+  ungroup() |>
+  mutate(transfer_type = case_when(
+    has_transferred == 0 & changed_team == 0 ~ "Never transferred",
+    has_transferred == 1 & changed_team == 1 ~ "Year immediately after transfer",
+    has_transferred == 1 & changed_team == 0 & first_transfer_made == 0 ~ "Has not transferred yet",
+    has_transferred == 1 & changed_team == 0 & first_transfer_made == 1 ~ "2+ years after last transfer"
+    ),
+    exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr"))) |>
+  
+  ggplot(aes(x = exp, y = mean_ppg, color = transfer_type)) +
+  geom_point() + geom_line(aes(group = transfer_type)) +
+  theme(legend.position = "bottom")
+```
