@@ -56,6 +56,7 @@ library(scales)
 library(factoextra)
 library(FactoMineR)
 library(plotly)
+library(gt)
 
 
 #code thanks to An!
@@ -452,6 +453,12 @@ df |>
      color = "darkred",
    )
  
+ # elbow around 3 component
+ # while the red horizontal line says around 6 components is optimal
+ # if we want to visualize, we can only use 2-3 components
+ # however, pcs 1, 2, and 3 explain 62.4 percent of the variance
+ # which is still a decent level
+ 
  player_performance_pc_data <- player_performance_pca$x[, 1:3]
  
  fviz_nbclust(player_performance_pc_data, kmeans, method = "wss")
@@ -462,38 +469,158 @@ set.seed(1234)
  
  player_performance_stats_pca <- player_performance_stats_pca |>
    mutate(cluster = factor(km$cluster))
+ 
+transfers     <- player_performance_stats_pca |> filter(changed_team == 1)
+non_transfers <- player_performance_stats_pca |> filter(changed_team == 0)
 
  colnames(player_performance_stats_pca)
 
-transfers <- player_performance_stats_pca |>
-  filter(changed_team == 1)
  
-non_transfers <- player_performance_stats_pca |>
-  filter(changed_team == 0) 
  
-#non-transfers
-plot_ly(
-   data = non_transfers,
+transfer_plot <- plot_ly(
+   data = transfers,
    x = ~pc1,
    y = ~pc2,
-   z = ~player_performance_pca$x[,3],
-   color = ~cluster, 
-   type = "scatter3d",
-   mode = "markers"
+   z = ~pc3,
+   color = ~cluster
  )
 
-# elbow around 3 component
-# while the red horizontal line says around 6 components is optimal
-# if we want to visualize, we can only use 2-3 components
-# however, pcs 1, 2, and 3 explain 62.4 percent of the variance
-# which is still a decent level
+transfer_plot
+
+non_transfer_plot <- plot_ly(
+  data = non_transfers,
+  x = ~pc1,
+  y = ~pc2,
+  z = ~pc3,
+  color = ~cluster
+)
+
+non_transfer_plot
+
+# ok so its hard to see the difference in the graphs so i shall make a table
+
+player_performance_table <- player_performance_stats_pca |>
+  count(changed_team, cluster) |>
+  group_by(changed_team) |> 
+  # get to percent
+  mutate(percent = 100*n/sum(n)) |>
+  ungroup() |>
+  select(changed_team, cluster, percent) |>
+  pivot_wider(names_from = cluster,
+              values_from = percent) |>
+  gt()
+
+player_performance_table
+# what do we learn from this table?
+
+# on the non-transfer side: the values are closer together, this kinda makes sense
+# because a lot of our data is made up of non-transfers, and just doing this analysis 
+# on the overall dataset gives us the character archetypes. the most find themselves
+# in cluster 3, which are players that don't get a ton of minutes and play around slightly
+# above average defense and slightly below average shooting. the least amount of players 
+# that fall in a cluster is cluster 4, which is made of players that also don't get 
+# a ton of minutes, have slightly above average shooting and slightly below average
+# defensive skills.
+
+# on the transfer side: the cluster with the most by 12% is cluster 3. these are the 
+# players that don't get a ton of minutes and play around slightly above average 
+# defense and slightly below average shooting. they are mainly transfering 
+
 
 # An advised to try kmeans instead of hierarchical because of the number of observations
 
 
+
 # success by position
 # success relative to those in the same position
-# RAPM?
+
+unique(df$pos)
+
+
+#list function?
+
+
+#scale all the metrics
+position_df <- df |>
+  group_by(pos) |>
+  mutate(z_bpm = scale(bpm),
+         z_ts = scale(ts),
+         z_usg = scale(usg),
+         z_ast_to = scale(ast_to),
+         z_adj_de = scale(adj_de),
+         z_porpag = scale(porpag),
+         z_obpm = scale(obpm),
+         z_ppg = scale(ppg),
+         z_dreb = scale(dreb),
+         z_oreb = scale(oreb),
+         z_bpg = scale(bpg),
+         z_dbpm = scale(dbpm),
+         z_three_pct = scale(three_pct),
+         z_apg = scale(apg),
+         z_stl = scale(stl),
+         z_adj_oe = scale(adj_oe)) |>
+  ungroup()
+
+
+# position_weights <- list(
+#   "Wing G" = c(bpm = 0.24, ts = 0.22, usg = 0.2, ast_to = 0.18, agj_de = 0.16),
+#   "Combo G" = c(bpm = 0.24, ast_to = 0.22, ts = 0.2, porpag = 0.18, usg = 0.16),
+#   "Scoring PG" = c(ts = 0.24, obpm = 0.22, ppg = 0.2, ast_to = 0.18, usg = 0.16),
+#   "PF/C" = c(ts = 0.24, dreb = 0.22, oreb = 0.2, bpg = 0.18, dbpm = 0.16),
+#   "Wing F" = c(ts = 0.24, dbpm = 0.22, obpm = 0.2, three_pct = 0.18, usg = 0.16),
+#   "C" = c(ts = 0.24, oreb = 0.22, dreb = 0.2, bpg = 0.18, dbpm = 0.16),
+#   "Pure PG" = c(apg = 0.24, ast_to = 0.22, stl = 0.2, ts = 0.18, usg = 0.16),
+#   "Stretch 4" = c(three_pct = 0.24, ts = 0.22, adj_oe = 0.2, dreb = 0.18, usg = 0.16)
+
+Wing_G_df <- position_df |>
+  filter(pos == "Wing G") |>
+  mutate(success_score = (z_bpm*.24) + (z_ts*.22) + (z_usg*.20) + (z_ast_to*.18) + (z_adj_de*.16))
+
+Combo_G_df <- position_df |>
+  filter(pos == "Combo G") |>
+  mutate(success_score = (z_bpm*.24) + (z_ast_to*.22) + (z_ts*.20) + (z_porpag*.18) + (z_usg*.16))
+
+Scoring_PG_df <- position_df |>
+  filter(pos == "Scoring PG") |>
+  mutate(success_score = (z_ts*.24) + (z_obpm*.22) + (z_ppg*.20) + (z_ast_to*.18) + (z_usg*.16))
+
+PF_C_df <- position_df |>
+  filter(pos == "PF/C") |>
+  mutate(success_score = (z_ts*.24) + (z_dreb*.22) + (z_oreb*.20) + (z_bpg*.18) + (z_usg*.16))
+
+Wing_F_df <- position_df |>
+  filter(pos == "Wing F") |>
+  mutate(success_score = (z_ts*.24) + (z_dbpm*.22) + (z_obpm*.20) + (z_three_pct*.18) + (z_usg*.16))
+  
+C_df <- position_df |>
+  filter(pos == "C") |>
+  mutate(success_score = (z_ts*.24) + (z_oreb*.22) + (z_dreb*.20) + (z_bpg*.18) + (z_dbpm*.16))
+
+Pure_PG_df <- position_df |>
+  filter(pos == "Pure PG") |>
+  mutate(success_score = (z_apg*.24) + (z_ast_to*.22) + (z_stl*.20) + (z_ts*.18) + (z_usg*.16))
+
+Stretch_4_df <- position_df |>
+  filter(pos == "Stretch 4") |>
+  mutate(success_score = (z_three_pct*.24) + (z_ts*.22) + (z_adj_oe*.20) + (z_dreb*.18) + (z_usg*.16))
+
+position_df <- bind_rows(Wing_G_df, Combo_G_df, Scoring_PG_df, PF_C_df, Wing_F_df, C_df, Pure_PG_df, Stretch_4_df)
+
+position_df <- position_df |>
+  relocate(success_score)
+
+# did transfers perform better relative to their peers at the same position?
+
+position_df |>
+  drop_na(pos) |>
+  group_by(pos, changed_team) |>
+  summarise(mean_score = mean(success_score, na.rm = TRUE)) |>
+  ggplot(aes(x = changed_team, y = mean_score)) +
+  geom_col() +
+  facet_wrap(~pos)
+
+# RAPM?# posRAPM?
+
 
 
 
