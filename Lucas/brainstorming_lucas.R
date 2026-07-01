@@ -57,6 +57,7 @@ library(factoextra)
 library(FactoMineR)
 library(plotly)
 library(gt)
+library(patchwork)
 
 
 #code thanks to An!
@@ -73,13 +74,33 @@ df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
 #if team name is equal to the team name in the previous year
 
 #actually get rid of has_transffered its not really helpful
-#transfer_df <- df |>
-#  group_by(player) |>
-#  filter(n_distinct(team) > 1) |>
-#  ungroup()
+transfer_df <- df |>
+  group_by(player) |>
+  filter(n_distinct(team) > 1) |>
+  ungroup()
 
-#df <- df |>
-#  mutate(has_transferred = player %in% transfer_df$player)
+df <- df |>
+  mutate(has_transferred = player %in% transfer_df$player)
+
+career_transfers_by_player <- transfer_df |>
+  select(id, year, team) |>
+  arrange(id, year) |>
+  group_by(id) |>
+  mutate(prev_team = lag(team),
+         transfer_made = ifelse(!(is.na(prev_team)) & (team != prev_team),
+                                1, 0),
+         cumulative_career_transfers = cumsum(transfer_made),
+         num_transfers = max(cumulative_career_transfers)) |>
+  select(id, year, cumulative_career_transfers, num_transfers)
+
+career_transfers_by_player
+
+df <- df |>
+  left_join(career_transfers_by_player |>
+              select(cumulative_career_transfers), by = "id")
+
+df <- df |>
+  relocate(cumulative_career_transfers)
 
 #df <- df |>
 #  select(-is_transfer)
@@ -278,11 +299,39 @@ long2 |>
 
 #plotting it x vs y
 df |>
+  ggplot(aes(x = mpg)) +
+  stat_ecdf(geom = "step") +
+  scale_x_continuous(breaks = seq(0, 100, by = 5)) 
+
+df_filtered <- df |> 
+  filter(changed_team == TRUE) |> 
+  filter(mpg > 7.5 | prev_mpg > 7.5) 
+
+p_build <- ggplot(df_filtered, aes(x = prev_mpg, y = mpg)) + geom_smooth()
+p_build
+smooth_data <- ggplot_build(p_build)$data[[1]]
+smooth_data
+intersect_idx <- which.min(abs(smooth_data$y - smooth_data$x))
+intersect_x   <- smooth_data$x[intersect_idx]
+intersect_y   <- smooth_data$y[intersect_idx]
+
+theme_set(theme_bw())
+
+before_after_mpg <- df |>
   filter(changed_team == TRUE) |>
+  filter(ppg > 2 & prev_ppg > 2) |>
   ggplot(aes(x = prev_mpg, y = mpg)) +
   geom_point(alpha = 0.6) +
   geom_smooth() +
-  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5)
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5) +
+  labs(x = "before transfer",
+       y = "after transfer",
+       title = "Minutes per game") +
+  theme(axis.title = element_text(size = 10),
+        plot.title = element_text(size = 17))
+  
+
+plot_data <- ggplot()
 #if a player had less that ~22 minutes per game, on average, they recieved more 
 #minutes after their transfer, however, if a player had more than 22 minutes,
 #on average, they recieved less playing time at the school they transferred to 
@@ -388,11 +437,43 @@ long_ppg |>
 
 #plotting it x vs y
 df |>
+  ggplot(aes(x = ppg)) +
+  stat_ecdf(geom = "step") +
+  scale_x_continuous(breaks = seq(0, 25, by = 5)) 
+
+df_ppg_filtered <- df |> 
+  filter(changed_team == TRUE) |> 
+  filter(ppg > 2) 
+
+p_ppg_build <- ggplot(df_ppg_filtered, aes(x = prev_ppg, y = ppg)) + geom_smooth()
+p_ppg_build
+smooth_ppg_data <- ggplot_build(p_ppg_build)$data[[1]]
+smooth_ppg_data
+intersect_ppg_idx <- which.min(abs(smooth_ppg_data$y - smooth_ppg_data$x))
+intersect_ppg_x   <- smooth_ppg_data$x[intersect_ppg_idx]
+intersect_ppg_y   <- smooth_ppg_data$y[intersect_ppg_idx]
+
+before_after_ppg <- df |>
   filter(changed_team == TRUE) |>
+  filter(ppg > 2 & prev_ppg > 2) |>
   ggplot(aes(x = prev_ppg, y = ppg)) +
   geom_point(alpha = 0.6) +
   geom_smooth() +
-  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5)
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5) + 
+  labs(x = "before transfer",
+       y = "after transfer",
+       title = "Points per game") +
+  theme(axis.title = element_text(size = 10),
+        plot.title = element_text(size = 17)) 
+  
+  
+
+# put these side by side
+
+side_by_side <- before_after_mpg + before_after_ppg
+
+ggsave("side_by_side_correct.png", plot = side_by_side)
+
 #if a player had less that ~7-8 points per game, on average, they received more 
 #points per game after their transfer, however, if a player had more than 7-8 points per game,
 #on average, they received less points per game time at the school they transferred to 
@@ -621,10 +702,30 @@ position_df |>
 
 # RAPM?# posRAPM?
 
+# make a gt table for data slide in slideshow
+set.seed(1234)
 
+data_table <- df |>
+  select(year, id, changed_team, mpg, prev_mpg, ppg, prev_ppg, has_transferred, cumulative_career_transfers) |>
+  slice_sample(n = 5) |>
+  gt() |>
+  cols_label(
+    year = "Year",
+    id = "Player ID",
+    changed_team = "Year After Transfer",
+    mpg = "Minutes Per Game",
+    prev_mpg = "Previous Year's Minutes Per Game",
+    ppg = "Points Per Game",
+    prev_ppg = "Previous Year's Minutes Per Game",
+    has_transferred = "Has Transferred",
+    cumulative_career_transfers = "Cumulative Career Transfers"
+  ) |>
+  fmt_number(
+    columns = c(mpg, prev_mpg, ppg, prev_ppg),
+    decimals = 2
+  )
 
-
-
+gtsave("data_table.png", data = data_table)
 
 
 
