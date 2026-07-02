@@ -1,0 +1,10 @@
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+library(broom)
+
+df <- read.csv("player_stats.csv")
+df
+```
