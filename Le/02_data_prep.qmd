@@ -66,26 +66,70 @@ I also created new columns to better identify the transfer patterns for each stu
 
 ```{r}
 career_transfers_by_player <- transfer_df |>
-  select(id, year, team, conf, conf_class) |>
+  select(id, year, team, conf, conf_class, ppg) |>
   arrange(id, year) |>
   group_by(id) |>
   mutate(prev_team = lag(team),
          prev_conf = lag(conf),
          prev_conf_class = lag(conf_class),
+         prev_ppg = lag(ppg),
+         # Player's transfer history
          changed_team = ifelse(!(is.na(prev_team)) & (team != prev_team),
                                 1, 0),
          cumulative_career_transfers = cumsum(changed_team),
          num_transfers = max(cumulative_career_transfers)) |>
-  select(-team, -conf, -conf_class)
+  
+  select(-team, -conf, -conf_class, -ppg)
 
 career_transfers_by_player
 ```
 
-Now rejoin these columns back into the dataset and fill in the NA values:
+Note that the previous points per game takes the points per game from the last season of the player in NCAA Division I.
+
+Now rejoin these columns back into the dataset:
 
 ```{r}
 df_enhanced <- df_enhanced |>
   left_join(career_transfers_by_player, join_by(id, year))
+
+df_enhanced
+```
+
+I have also created another indicator variable, `skipped_year_before`, that denotes players who skipped one or more years in the Division I based on the lack of data. Some possible reasons for this are redshirting or transferring to non-DI institutions.
+
+```{r}
+year_presence_d1 <- df_enhanced |>
+  select(id, year) |>
+  arrange(id, year) |>
+  group_by(id) |>
+  mutate(
+    
+    # Comparing the player's previous year in NCAA DI and the year immediately
+    # before to understand which player skipped one or more years in NCAA
+         prev_d1_year = lag(year),
+         year_before = year - 1,
+         skipped_year_before = case_when(
+           prev_d1_year == year_before ~ 0,
+           is.na(prev_d1_year) ~ 0,
+           prev_d1_year != year_before ~ 1
+         )) |>
+  
+  # Separate mutate command to specify that we don't know whether a player has
+  # skipped NCAA DI the year before if the year before is 2021
+  
+  mutate(skipped_year_before = case_when(
+    year_before == 2021 ~ NA,
+    TRUE ~ skipped_year_before
+  ))
+
+year_presence_d1
+```
+
+Again, join the new columns that I have created above back into the full dataset:
+
+```{r}
+df_enhanced <- df_enhanced |>
+  left_join(year_presence_d1, join_by(id, year))
 
 df_enhanced
 ```

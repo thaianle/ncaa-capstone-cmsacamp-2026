@@ -4,7 +4,68 @@ rm(list = ls()) # Clear the environment
 library(tidyverse)
 library(cbbdata)
 library(broom)
+library(hoopR)
 
 df <- read.csv("player_stats.csv")
 df
+```
+
+#### 1. EDA before modeling
+
+Distribution of the outcome variable (currently points per game):
+
+```{r}
+df |>
+  mutate(transfer_type = case_when(
+    changed_team == 1 ~ "transfer",
+    TRUE ~ "non_transfer"
+  )) |>
+  ggplot(aes(x = ppg)) +
+  geom_density() +
+  facet_wrap(~ transfer_type, ncol = 1)
+```
+
+```{r}
+df |>
+  mutate(transfer_type = case_when(
+    changed_team == 1 ~ "transfer",
+    TRUE ~ "non_transfer"
+  )) |>
+  filter(ppg == 0) |>
+  group_by(transfer_type) |>
+  count()
+```
+
+The proportion of zero observations (zero points per game) in the dataset is: `(971+45)/20117` = approx. 5%.
+
+Since the number of points per game of the players are strictly non-negative and right skewed, we can also use generalized linear models such as gamma regression and tweedie regression (as 5% of zeroes might be a substantial part of the data, depending on the use case).
+
+#### 2. Data preprocessing
+
+Splitting the dataset into athletes who have just transferred (`changed_team = 1`) and the rest:
+
+```{r}
+transfers <- df |>
+  filter(changed_team == 1) |>
+  filter(year > 2022)
+
+non_transfers <- df |>
+  filter(changed_team != 1 | is.na(changed_team)) |>
+  filter(year > 2022)
+
+nrow(transfers)
+nrow(non_transfers)
+```
+
+We will build a regression model with cross-validation. Our goal is to closely predict performance as much as possible, and no inference is needed at the current stage.
+
+As a reminder, the previous points per game takes the points per game from the last season of the player in NCAA Division I. We also temporarily filter out players in the 2021-22 season (`year == 2022`) because we do not currently have their previous season's points per game.
+
+#### 1. Linear regression
+
+The most basic baseline regression to answer the question:
+
+```{r}
+linreg_1 <- lm(ppg ~ prev_ppg, data = non_transfers)
+tidy(linreg_1, conf.int = TRUE)
 ```
