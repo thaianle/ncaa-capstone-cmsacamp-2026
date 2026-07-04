@@ -716,7 +716,7 @@ data_table <- df |>
     mpg = "Minutes Per Game",
     prev_mpg = "Previous Year's Minutes Per Game",
     ppg = "Points Per Game",
-    prev_ppg = "Previous Year's Minutes Per Game",
+    prev_ppg = "Previous Year's Points Per Game",
     has_transferred = "Has Transferred",
     cumulative_career_transfers = "Cumulative Career Transfers"
   ) |>
@@ -725,7 +725,7 @@ data_table <- df |>
     decimals = 2
   )
 
-gtsave("data_table.png", data = data_table)
+gtsave("data_table_correct.png", data = data_table)
 
 
 
