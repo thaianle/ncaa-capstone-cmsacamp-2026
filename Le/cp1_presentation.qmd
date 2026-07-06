@@ -1,0 +1,101 @@
+Note that the `player_stats.csv` dataset is created when we run all code chunks, in their specified order, of the `cp1_raw_data_prep.qmd` script.
+
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(cbbdata)
+
+df <- read.csv("player_stats.csv")
+df
+```
+
+```{r}
+# Redshirted players who were listed as freshman twice
+temp <- df |>
+  
+  select(id, exp, has_transferred, changed_team, cumulative_career_transfers, ppg) |>
+    mutate(first_transfer_made = ifelse(cumulative_career_transfers > 0, 1, 0)) |>
+  
+  filter(has_transferred == 1 & changed_team == 0
+         & first_transfer_made == 1 & exp == "So")
+
+temp
+```
+
+The players who are "double freshmen" have the IDs: 76132, 76580, 76910.
+
+Some players who are "double sophomores" include the following player IDs: 77600, 77535, 77390.
+
+```{r}
+temp2 <- df |>
+  filter(id %in% temp$id) |>
+  mutate(first_transfer_made = ifelse(cumulative_career_transfers > 0, 1, 0)) |>
+  select(id, player, exp, year, team, has_transferred, first_transfer_made,
+         changed_team, cumulative_career_transfers)
+```
+
+
+Transfer age curve:
+
+```{r}
+age_curves_dataset <- df |>
+  
+  # Add another column of whether player has made their first transfer in their career (time-sensitive)
+  select(exp, has_transferred, changed_team, cumulative_career_transfers, ppg) |>
+  mutate(first_transfer_made = ifelse(cumulative_career_transfers > 0, 1, 0)) |>
+  select(-cumulative_career_transfers) |>
+  
+  # Get the mean points per game of players of different types
+  group_by(exp, has_transferred, changed_team, first_transfer_made) |>
+  summarize(mean_ppg = mean(ppg, na.rm = TRUE)) |>
+  
+  # Group players based on their transfer history
+  ungroup() |>
+  mutate(transfer_type = case_when(
+    has_transferred == 0 & changed_team == 0 ~ "Never transferred",
+    has_transferred == 1 & changed_team == 1 ~ "Year immediately after transfer",
+    has_transferred == 1 & changed_team == 0 & first_transfer_made == 0 ~ "Has not transferred yet",
+    has_transferred == 1 & changed_team == 0 & first_transfer_made == 1 ~ "2+ years after last transfer*"
+    ),
+    exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr")))
+
+age_curves_dataset
+```
+
+
+```{r}
+# https://www.geeksforgeeks.org/r-language/how-to-fold-legend-into-two-rows-in-ggplot2-in-r/
+# https://stackoverflow.com/questions/8454243/move-axis-labels-ggplot
+# https://stackoverflow.com/questions/20407773/increase-legend-font-size-ggplot2
+
+# Set the theme of the plot
+theme_set(theme_bw())
+
+age_curves_dataset |>
+  # The base plot
+  ggplot(aes(x = exp, y = mean_ppg, color = transfer_type)) +
+  geom_point() + geom_line(aes(group = transfer_type)) +
+  # Set the colors for each line
+  scale_color_brewer(palette = "Dark2") +
+  #theme(legend.position = "bottom") +
+  #guides(color = guide_legend(nrow = 2)) +
+  # Refine axis, tick marks, and legend titles
+  labs(caption = "Data courtesy of the 'cbbdata' package by Andrew Weatherman (2023).\nSuper-seniors are also counted as 'seniors' in this dataset.",
+       x = "Player's year in college",
+       y = "Average points per game",
+       color = "Type of player") +
+  scale_x_discrete(labels = c("Freshman", "Sophomore", "Junior", "Senior")) +
+  # Slightly adjust the position of axis titles and captions
+  # Increase the size of axis labels and tick marks for readability
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 12, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 9, vjust = -2.5),
+        axis.text = element_text(size = 11),
+        legend.text = element_text(size = 12))
+
+ggsave("cp1_age_curves.png")
+```
+
+Additional issues to consider: the 4-2-4 transfer pathways (temporarily transfer to a junior college) and redshirting in determining whether a player has transferred.

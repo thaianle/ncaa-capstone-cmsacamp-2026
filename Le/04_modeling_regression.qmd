@@ -1,0 +1,272 @@
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+library(tidyverse)
+library(broom)
+library(cbbdata)
+library(hoopR)
+library(performance) # More advanced model fit metrics for glms
+library(mgcv) # For tweedie regression in R
+
+df <- read.csv("player_stats.csv")
+df
+```
+
+#### 1. EDA before modeling
+
+Distribution of the outcome variable (currently points per game):
+
+```{r}
+df |>
+  mutate(transfer_type = case_when(
+    changed_team == 1 ~ "transfer",
+    TRUE ~ "non_transfer"
+  )) |>
+  ggplot(aes(x = ppg)) +
+  geom_density() +
+  facet_wrap(~ transfer_type, ncol = 1)
+```
+
+```{r}
+df |>
+  mutate(transfer_type = case_when(
+    changed_team == 1 ~ "transfer",
+    TRUE ~ "non_transfer"
+  )) |>
+  filter(ppg == 0) |>
+  group_by(transfer_type) |>
+  count()
+```
+
+The proportion of zero observations (zero points per game) in the dataset is: `(971+45)/20117` = approx. 5%.
+
+Since the number of points per game of the players are strictly non-negative and right skewed, we can also use generalized linear models such as gamma regression and tweedie regression (as 5% of zeroes might be a substantial part of the data, depending on the use case).
+
+*(Also, check the specific assumptions for gamma and tweedie regression!)*
+
+#### 2. Data preprocessing dedicated to machine/statistical learning algorithms
+
+Splitting the dataset into athletes who have just transferred (`changed_team = 1`) and the rest:
+
+```{r}
+transfers <- df |>
+  filter(changed_team == 1) |>
+  filter(year > 2022)
+
+non_transfers <- df |>
+  filter(changed_team != 1 | is.na(changed_team)) |>
+  filter(year > 2022)
+
+nrow(transfers)
+nrow(non_transfers)
+```
+
+We will build a regression model with cross-validation. Our goal is to closely predict performance as much as possible, and no inference is needed at the current stage.
+
+As a reminder, the previous points per game takes the points per game from the last season of the player in NCAA Division I. We also temporarily filter out players in the 2021-22 season (`year == 2022`) because we do not currently have their previous season's points per game.
+
+A major note in this dataset is that observations might be temporally related, because certain players are tracked across multiple years. We will split the dataset into training and validation folds based on the season in which player data was recorded:
+
+```{r}
+non_transfers_2022 <- non_transfers |>
+  filter(year == 2022)
+
+non_transfers_2023 <- non_transfers |>
+  filter(year == 2023)
+
+non_transfers_2024 <- non_transfers |>
+  filter(year == 2024)
+```
+
+We determine the possible training and validation sets as follows, based on the year in which the data was recorded:
+
+| Training set  | Validation set |
+|:-------------:|:--------------:|
+|     2022      |      2023      |
+|     2022      | 2023 and 2024  |
+|     2023      |      2024      |
+| 2022 and 2023 |      2024      |
+
+For better splits, I may need to get more data from the 2020-21 season on certain metrics, such as previous points per game and previous team rating.
+
+#### 3. Linear regression
+
+According to Lecture 16 slides, with a classic linear regression model, the deviance equals the residual sum of squares (RSS). We can also access the adjusted R^2^ (adjusted pseudo-R^2^ or McFadden's R^2^ in GLMs) to determine the variance or deviance explained by the model.
+
+[A paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC8279135/) actually suggested R^2^ is a better evaluation metric than RSS-derived metrics, but we will go over it later.
+
+Here are the most basic baseline regressions to answer the question:
+
+```{r}
+# https://stackoverflow.com/questions/69305380/extract-list-name-passed-to-function-as-string-in-r
+
+model_result <- function(model_var) {
+  
+  # Extract the model's name as specified by the user as a variable name
+  sp_model_name <- deparse(substitute(model_var))
+  
+  # Create a tibble storing model name and deviance of the current model
+  current_tibble <- tibble(
+    model_name = sp_model_name,
+    deviance_explained = 1 - (model_var$deviance / model_var$null.deviance)
+  )
+  
+  return(current_tibble)
+  
+}
+```
+
+```{r}
+null_model <- glm(ppg ~ 1, data = non_transfers,
+                  family = gaussian(link = "identity"))
+
+linreg_1 <- glm(ppg ~ prev_ppg, data = non_transfers,
+                family = gaussian(link = "identity"))
+
+linreg_2 <- glm(ppg ~ prev_ppg + pos + exp, data = non_transfers,
+                family = gaussian(link = "identity"))
+
+linreg_3 <- glm(ppg ~ prev_ppg + pos + exp + current_barthag +
+                  conf_class + has_transferred,
+                data = non_transfers,
+                family = gaussian(link = "identity"))
+
+model_perf_board <- bind_rows(
+  model_result(null_model), model_result(linreg_1),
+  model_result(linreg_2), model_result(linreg_3)
+  )
+
+model_perf_board
+```
+
+We can also extend our regression configuration with Poisson regression, tweedie regression, and Generalized Additive Models (GAMs), like this:
+
+```{r}
+tweedie_1 <- gam(ppg ~ prev_ppg, data = non_transfers,
+                 family = tw(link = "identity"))
+
+tweedie_2 <- gam(ppg ~ prev_ppg + pos + exp, data = non_transfers,
+                 family = tw(link = "identity"))
+
+tweedie_3 <- gam(ppg ~ prev_ppg + pos + exp + current_barthag +
+                  conf_class + has_transferred,
+                 data = non_transfers,
+                 family = tw(link = "identity"))
+
+# It seemed like categorical variables are not allowed to be in a smoothing spline
+# to avoid raising errors when implementing a GAM
+
+non_transfers_new <- non_transfers |>
+  mutate(pos = as.factor(pos),
+         exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr")),
+         conf_class = factor(conf_class,
+                             levels = c("low-major", "mid-major", "high-major")),
+         has_transferred = as.factor(has_transferred))
+
+non_transfers_new$prev_ppg <- unlist(non_transfers_new$prev_ppg)
+
+gam_1 <- gam(ppg ~ s(prev_ppg), data = non_transfers_new,
+             family = gaussian(link = "identity"))
+
+gam_2 <- gam(ppg ~ s(prev_ppg) + pos + exp,
+             data = non_transfers_new, family = gaussian(link = "identity"))
+
+gam_3 <- gam(ppg ~ s(prev_ppg) + s(current_barthag) + pos + exp + conf_class,
+             data = non_transfers_new, family = gaussian(link = "identity"))
+
+model_perf_board_2 <- bind_rows(
+  model_perf_board,
+  model_result(tweedie_1), model_result(tweedie_2), model_result(tweedie_3),
+  model_result(gam_1), model_result(gam_2), model_result(gam_3)
+  )
+
+model_perf_board_2
+```
+
+I randomly found [this link](https://library.virginia.edu/data/articles/getting-started-tweedie-models-0) as a good reference for tweedie regression and its implementation in R.
+
+\[Note that we can also fit generalized linear models with other powerful tree-based algorithms, including XGBoost.\]
+
+#### Appendix: Using McFadden's adjusted R^2^ to compare between GLMs (WORKING CODE)
+
+```{r, eval = FALSE}
+# https://stats.oarc.ucla.edu/other/mult-pkg/faq/general/faq-what-are-pseudo-r-squareds/
+# https://stackoverflow.com/questions/67286343/r-code-to-get-log-likelihood-for-binary-logistic-regression
+```
+
+Here are the most basic baseline regressions to answer the question:
+
+```{r, eval = FALSE}
+# https://stackoverflow.com/questions/69305380/extract-list-name-passed-to-function-as-string-in-r
+
+add_model <- function(model_var, model_perf_board) {
+  
+  # Extract the model's name as specified by the user as a variable name
+  sp_model_name <- deparse(substitute(model_var))
+  
+  # Compute the adjusted McFadden's R^2 using log likelihood
+  k <- model_var$rank
+  null_model <- update(model_var, . ~ 1)
+  
+  result <- 1 - (as.numeric(logLik(model_var)) - k) / as.numeric(logLik(null_model))
+  result <- -log(result)
+  
+  # Create a tibble storing model name and performance of the current model
+  current_tibble <- tibble(
+    model_name = sp_model_name,
+    r2_mcfadden_adjusted = result
+  )
+  
+  # Add a model to an existing model performance board
+  # Note that the model_perf_board needs to be initialized first at this stage
+  r2_mcfadden_tibble <- bind_rows(model_perf_board, current_tibble)
+  return(r2_mcfadden_tibble)
+  
+}
+```
+
+```{r, eval = FALSE}
+# Initialize the R^2 McFadden tibble of different models
+model_perf_board <- tibble(
+  model_name = character(),
+  r2_mcfadden_adjusted = numeric()
+)
+
+linreg_1 <- glm(ppg ~ prev_ppg, data = non_transfers,
+                family = gaussian(link = "identity"))
+
+linreg_2 <- glm(ppg ~ prev_ppg + pos + exp, data = non_transfers,
+                family = gaussian(link = "identity"))
+
+linreg_3 <- glm(ppg ~ prev_ppg + pos + exp + current_barthag +
+                  conf_class + has_transferred,
+                data = non_transfers,
+                family = gaussian(link = "identity"))
+
+model_perf_board <- add_model(linreg_1, model_perf_board)
+model_perf_board <- add_model(linreg_2, model_perf_board)
+model_perf_board <- add_model(linreg_3, model_perf_board)
+model_perf_board
+```
+
+What about applying a tweedie regression with these variables, also using `glm`?
+
+See [this link](https://library.virginia.edu/data/articles/getting-started-tweedie-models-0) for reference.
+
+```{r, eval = FALSE}
+tweedie_1 <- gam(ppg ~ prev_ppg, data = non_transfers,
+                 family = tw(link = "identity"))
+
+tweedie_2 <- gam(ppg ~ prev_ppg + pos + exp, data = non_transfers,
+                 family = tw(link = "identity"))
+
+tweedie_3 <- gam(ppg ~ prev_ppg + pos + exp + current_barthag +
+                  conf_class + has_transferred,
+                 data = non_transfers,
+                 family = tw(link = "identity"))
+
+model_perf_board <- add_model(tweedie_1, model_perf_board)
+model_perf_board <- add_model(tweedie_2, model_perf_board)
+model_perf_board <- add_model(tweedie_3, model_perf_board)
+model_perf_board
+```

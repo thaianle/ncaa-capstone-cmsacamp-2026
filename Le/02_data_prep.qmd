@@ -18,12 +18,29 @@ df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
 df
 ```
 
+Update the conference classification and previous conference to the dataset (code by Kendall):
+
+```{r}
+df_enhanced <- df |>
+  # Move the unique player ID to the front for readability first
+  relocate(id) |>
+  mutate(conf_class = case_when(
+    conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
+    conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
+    conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
+              "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
+              "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
+  ))
+
+df_enhanced
+```
+
 Kendall helped me with the code for the `has_transferred` and `changed_team` variables!
 
 ```{r}
 # Exploring Kendall's code (adjusted to group by player IDs instead of player names)
 
-transfer_df <- df |>
+transfer_df <- df_enhanced |>
   group_by(id) |>
   filter(n_distinct(team) > 1) |>
   ungroup()
@@ -33,35 +50,96 @@ transfer_df
 
 ```{r}
 # Whether a player has transferred - make it a binary variable for easier coding
-df_enhanced <- df |>
+df_enhanced <- df_enhanced |>
   mutate(has_transferred = ifelse(id %in% transfer_df$id, 1, 0))
 
 df_enhanced
 ```
 
+I have refined the code for the `changed_team` variable originally proposed by Kendall to account for players who transferred out of a NCAA Division I institution, or redshirted due to certain factors.
+
+I also created new columns to better identify the transfer patterns for each student-athlete:
+
+- `cumulative_career_transfers`: Cumulative number of college career transfers for each player. Each time a player transfers to a new team, the number increases by 1.
+
+- `num_transfers`: The total number of transfers that a particular player has made throughout their entire college career (some people can have more than one transfers).
+
 ```{r}
-# trying to make transfer out year/transfer in year
-# changed_team is the first year after transfer
-df_enhanced <- df_enhanced |>
+career_transfers_by_player <- transfer_df |>
+  select(id, year, team, conf, conf_class, ppg) |>
   arrange(id, year) |>
   group_by(id) |>
   mutate(prev_team = lag(team),
-         prev_year = lag(year),
-         #if they have a previous team AND 
-         #the year is the one right after the previous year AND 
-         #the team they're on is not the same as the previous team THEN
-         #changed_team is through IF NOT THEN
-         #changed_team is false 
-         changed_team = ifelse(!is.na(prev_team) &
-                                 year == (prev_year + 1) &
-                                 team != prev_team,
-                               1,
-                               0))
+         prev_conf = lag(conf),
+         prev_conf_class = lag(conf_class),
+         prev_ppg = lag(ppg),
+         # Player's transfer history
+         changed_team = ifelse(!(is.na(prev_team)) & (team != prev_team),
+                                1, 0),
+         cumulative_career_transfers = cumsum(changed_team),
+         num_transfers = max(cumulative_career_transfers)) |>
+  
+  select(-team, -conf, -conf_class, -ppg)
+
+career_transfers_by_player
+```
+
+Note that the previous points per game takes the points per game from the last season of the player in NCAA Division I.
+
+Now rejoin these columns back into the dataset:
+
+```{r}
+df_enhanced <- df_enhanced |>
+  left_join(career_transfers_by_player, join_by(id, year))
 
 df_enhanced
 ```
 
-Filling in the experience level for the remaining players: - Jason Umosella (La Salle University): Freshman (as of 2024-25) ([link](https://goexplorers.com/sports/mens-basketball/roster/jason-umosella/12302)) - Fedor Zugic (Creighton University): Sophomore (as of 2024-25) ([link](https://gocreighton.com/sports/mens-basketball/roster/fedor-zcaronugi/8569))
+I have also created another indicator variable, `skipped_year_before`, that denotes players who skipped one or more years in the Division I based on the lack of data. Some possible reasons for this are redshirting or transferring to non-DI institutions.
+
+```{r}
+year_presence_d1 <- df_enhanced |>
+  select(id, year) |>
+  arrange(id, year) |>
+  group_by(id) |>
+  mutate(
+    
+    # Comparing the player's previous year in NCAA DI and the year immediately
+    # before to understand which player skipped one or more years in NCAA
+         prev_d1_year = lag(year),
+         year_before = year - 1,
+         skipped_year_before = case_when(
+           prev_d1_year == year_before ~ 0,
+           is.na(prev_d1_year) ~ 0,
+           prev_d1_year != year_before ~ 1
+         )) |>
+  
+  # Separate mutate command to specify that we don't know whether a player has
+  # skipped NCAA DI the year before if the year before is 2021
+  
+  mutate(skipped_year_before = case_when(
+    year_before == 2021 ~ NA,
+    TRUE ~ skipped_year_before
+  ))
+
+year_presence_d1
+```
+
+Again, join the new columns that I have created above back into the full dataset:
+
+```{r}
+df_enhanced <- df_enhanced |>
+  left_join(year_presence_d1, join_by(id, year))
+
+df_enhanced
+```
+
+We can check the code's accuracy by filtering the current `df_enhanced` dataset for a particular player ID that transfers the most, such as `65627` and `70342`.
+
+Filling in the experience level for the remaining players:
+
+- Jason Umosella (La Salle University): Freshman (as of 2024-25) ([link](https://goexplorers.com/sports/mens-basketball/roster/jason-umosella/12302))
+- Fedor Zugic (Creighton University): Sophomore (as of 2024-25) ([link](https://gocreighton.com/sports/mens-basketball/roster/fedor-zcaronugi/8569))
 
 ```{r}
 df_enhanced |>
@@ -85,112 +163,6 @@ df_enhanced |>
   filter(player %in% c("Jason Umosella", "Fedor Zugic"))
 ```
 
-Update the conference classification and previous conference to the dataset (code by Kendall):
-
-```{r}
-df_enhanced <- df_enhanced |>
-  mutate(conference_classification = case_when(
-    conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
-    conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
-    conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
-              "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
-              "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
-  ))
-```
-
-```{r}
-# bar graph for transfer players by conference
-df_enhanced <- df_enhanced |>
-  mutate(prev_conf_class = lag(conference_classification))
-
-df_enhanced <- df_enhanced |>
-  relocate(prev_conf_class)
-
-df_enhanced <- df_enhanced |>
-  mutate(prev_conf = lag(conf))
-
-df_enhanced <- df_enhanced |>
-  relocate(prev_conf)
-```
-
-Create new "transfer incoming year" variables to better fit the diff-in-diff modeling:
-
-```{r}
-incoming_freshman_ids <- df_enhanced |>
-  filter(changed_team == 1 & exp == "Fr") |>
-  distinct(id) |>
-  mutate(transfer_incoming_fr = 1)
-
-incoming_sophomore_ids <- df_enhanced |>
-  filter(changed_team == 1 & exp == "So") |>
-  distinct(id) |>
-  mutate(transfer_incoming_so = 1)
-
-incoming_junior_ids <- df_enhanced |>
-  filter(changed_team == 1 & exp == "Jr") |>
-  distinct(id) |>
-  mutate(transfer_incoming_jr = 1)
-
-incoming_senior_ids <- df_enhanced |>
-  filter(changed_team == 1 & exp == "Sr") |>
-  distinct(id) |>
-  mutate(transfer_incoming_sr = 1)
-
-incoming_freshman_ids
-incoming_sophomore_ids
-incoming_junior_ids
-incoming_senior_ids
-```
-
-Now rejoin these columns back into the dataset and fill in the NA values:
-
-```{r}
-# https://tidyr.tidyverse.org/reference/replace_na.html
-
-df_enhanced <- df_enhanced |>
-  left_join(incoming_freshman_ids, join_by(id)) |>
-  left_join(incoming_sophomore_ids, join_by(id)) |>
-  left_join(incoming_junior_ids, join_by(id)) |>
-  left_join(incoming_senior_ids, join_by(id)) |>
-  # Replace the NA values (for columns not present in the "right" table) with 0
-  mutate(transfer_incoming_fr = replace_na(transfer_incoming_fr, 0),
-         transfer_incoming_so = replace_na(transfer_incoming_so, 0),
-         transfer_incoming_jr = replace_na(transfer_incoming_jr, 0),
-         transfer_incoming_sr = replace_na(transfer_incoming_sr, 0))
-  
-```
-
-Create new columns to better identify the transfer patterns for each student-athlete:
-
-- `cumulative_career_transfers`: Cumulative number of college career transfers for each player. Each time a player transfers to a new team, the number increases by 1.
-
-- `num_transfers`: The total number of transfers that a particular player has made throughout their entire college career (some people can have more than one transfers).
-
-```{r}
-# Filter for players who have transferred in their career, taking advantage of
-# IDs in the transfer_df dataframe
-
-career_transfers_by_player <- transfer_df |>
-  select(id, year, team) |>
-  arrange(id, year) |>
-  group_by(id) |>
-  mutate(prev_team = lag(team),
-         transfer_made = ifelse(!(is.na(prev_team)) & (team != prev_team),
-                                1, 0),
-         cumulative_career_transfers = cumsum(transfer_made),
-         num_transfers = max(cumulative_career_transfers)) |>
-  select(id, year, cumulative_career_transfers, num_transfers)
-
-career_transfers_by_player
-```
-
-Join these columns back to the dataset. Note that to better identify players who have never transferred in their college careers, I will leave the `cumulative_career_transfers` and `num_transfers` as `NA` values.
-
-```{r}
-df_enhanced <- df_enhanced |>
-  left_join(career_transfers_by_player, join_by(id, year))
-```
-
 ```{r}
 df_enhanced
 ```
@@ -211,39 +183,205 @@ df_team_ratings_2024 <- torvik_ratings(year = 2024)
 df_team_ratings_2025 <- torvik_ratings(year = 2025)
 
 # Concatenate all datasets together and filter for only necessary rows
+
+# Note that some team names in `df_team_ratings` are different from our previous
+# dataset, `df_enhanced`; so we need to change their names to merge these two
+# datasets better
+
 df_team_ratings <- bind_rows(df_team_ratings_2022, df_team_ratings_2023,
                              df_team_ratings_2024, df_team_ratings_2025) |>
-  select(year, team, barthag)
+  select(year, team, barthag) |>
+  rename(team_hoopR = team) |>
+  mutate(team_cbbdata = case_when(
+    team_hoopR == "Charleston" ~ "College of Charleston",
+    team_hoopR == "LIU" ~ "LIU Brooklyn",
+    team_hoopR == "North Carolina" ~ "North Carolina St.",
+    team_hoopR == "Purdue Fort Wayne" ~ "Fort Wayne",
+    team_hoopR == "East Texas A&M" ~ "Texas A&M Commerce",
+    team_hoopR == "Detroit Mercy" ~ "Detroit",
+    team_hoopR == "Saint Francis" ~ "St. Francis PA",
+    team_hoopR == "Louisiana" ~ "Louisiana Lafayette",
+    team_hoopR == "IU Indy" ~ "IUPUI",
+    TRUE ~ team_hoopR
+  )) |>
+  select(-team_hoopR)
 
 df_team_ratings
 ```
 
-Alternatively, I might also use the "adjusted net efficiency rating", which is a part of determining the NET rankings of the college basketball teams. Thus, it plays an indirect role in determining the teams that will be playing in the NCAA tournament, particularly for at-large bids.
-
-I will create some more variables in the working dataframe, `df_enhanced`. This applies to all players including those who did not transfer. They should be blank for the 2022 season because we were not so sure about the player's previous team:
-
-- `prev_season_all`: The previous season for the player, which can be represented as a formula: `prev_season_all = year - 1`.
-- `prev_team_all`: Team played in the previous season.
-- `prev_t_rank_all`: The rating of the team in the previous season.
-- `current_t_rank_all`: The rating of the team in the current season.
+We also need to standardize the team names in the original dataset, `df_enhanced` as well:
 
 ```{r}
 df_enhanced <- df_enhanced |>
-  mutate(prev_season_all = year - 1,
-         prev_team_all = case_when(
-           year == 2022 ~ NA,
-           year > 2022 & changed_team == 1 ~ prev_team,
-           year > 2022 & changed_team == 0 ~ team
-         ))
-
-df_enhanced <- df_enhanced |>
-  # Add the team rating in the current season
-  left_join(df_team_ratings, join_by(year, team)) |>
-  rename(current_t_rank_all = barthag) |>
-  # Add the team rating in the previous season
-  left_join(df_team_ratings, join_by(prev_season_all == year, team)) |>
-  rename(prev_t_rank_all = barthag)
+  mutate(team = case_when(
+    team == "Charleston" ~ "College of Charleston",
+    team == "LIU" ~ "LIU Brooklyn",
+    team == "North Carolina" ~ "North Carolina St.",
+    team == "Purdue Fort Wayne" ~ "Fort Wayne",
+    team == "East Texas A&M" ~ "Texas A&M Commerce",
+    team == "Detroit Mercy" ~ "Detroit",
+    team == "Saint Francis" ~ "St. Francis PA",
+    team == "Louisiana" ~ "Louisiana Lafayette",
+    team == "IU Indy" ~ "IUPUI",
+    TRUE ~ team
+  ))
 ```
+
+I will create some more variables in the working dataframe, `df_enhanced`. This applies to all players including those who did not transfer. They should be blank for the 2022 season because we were not so sure about the player's previous team:
+
+- `prev_year`: The previous season for the player, which can be represented as a formula: `prev_year = year - 1`. \[adjust later: add for redshirting or temporarily away from NCAA DI\]
+- `prev_barthag_current`: The Barthag rating of the current team in the previous season (the "destination team" for player transfers).
+- `current_barthag`: The Barthag rating of the current team in the current season.
+
+```{r}
+df_enhanced <- df_enhanced |>
+  mutate(prev_year = year - 1) |>
+  # Add the team rating in the current season
+  left_join(df_team_ratings, join_by(year, team == team_cbbdata)) |>
+  rename(current_barthag = barthag) |>
+  # Add the team rating of the current team in the previous season
+  left_join(df_team_ratings, join_by(prev_year == year, team == team_cbbdata)) |>
+  rename(prev_barthag_current = barthag)
+
+df_enhanced
+```
+
+We will check for null values in the team ranks as an indicator of whether our merging is valid, as spelling and styling variations create different value of team names that refer to the same institution:
+
+```{r}
+# https://www.datanovia.com/en/lessons/identify-and-remove-duplicate-data-in-r/
+df_enhanced |>
+  filter((is.na(current_barthag) | is.na(prev_barthag_current)) & (year != 2022)) |>
+  select(team, year, current_barthag, prev_barthag_current) |>
+  distinct(team, year, .keep_all = TRUE) |>
+  arrange(team)
+```
+
+All observations in this output does not have previous Barthag score, because they did not compete in NCAA Division I men's basketball in the previous year (they were in Division II). Therefore, we can temporarily safely declare that the merge on standardized team names is valid.
+
+For better modeling, we can also fill in these `NA` values with a zero Barthag score. According to [this blog post](https://adamcwisports.blogspot.com/p/every-possession-counts.html), the Barthag score represents a team's chance of winning against an *average* DI team, and it seems that (and AI said that) there is no team with a Barthag rating of exactly zero. The gap of athletic ability between Division I and lower-division teams is usually large, so we can safely impute zero for all the `NA` values that we have seen in the previous output.
+
+```{r}
+# https://tidyr.tidyverse.org/reference/replace_na.html
+df_enhanced <- df_enhanced |>
+  mutate(prev_barthag_current = case_when(
+    year == 2022 ~ NA, # We do not have 2021 Barthag ratings for the teams yet
+    year >= 2023 ~ replace_na(prev_barthag_current, 0)
+  ))
+
+df_enhanced
+```
+
+Finally, I will export the dataframe to a CSV file for later use (This should not be pushed into a public GitHub repo):
+
+```{r}
+write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
+```
+
+#### Appendix 1: Kendall's original code for the `changed_team` variable
+
+```{r}
+# Kendall's original code:
+
+# trying to make transfer out year/transfer in year
+# changed_team is the first year after transfer
+#df_enhanced <- df_enhanced |>
+  #arrange(id, year) |>
+  #group_by(id) |>
+  #mutate(prev_team = lag(team),
+         #prev_year = lag(year),
+         #if they have a previous team AND 
+         #the year is the one right after the previous year AND 
+         #the team they're on is not the same as the previous team THEN
+         #changed_team is through IF NOT THEN
+         #changed_team is false 
+         #changed_team = ifelse(!is.na(prev_team) &
+                                 #year == (prev_year + 1) &
+                                 #team != prev_team,
+                               #1,
+                               #0))
+
+#df_enhanced
+```
+
+#### Appendix 2: Kendall's original code for team conference classification variables
+
+```{r}
+#df_enhanced <- df_enhanced |>
+  #mutate(conference_classification = case_when(
+    #conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
+    #conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
+    #conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
+              #"Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
+              #"SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
+  #))
+```
+
+```{r}
+# bar graph for transfer players by conference
+#df_enhanced <- df_enhanced |>
+  #mutate(prev_conf_class = lag(conference_classification))
+
+#df_enhanced <- df_enhanced |>
+  #relocate(prev_conf_class)
+
+#df_enhanced <- df_enhanced |>
+  #mutate(prev_conf = lag(conf))
+
+#df_enhanced <- df_enhanced |>
+  #relocate(prev_conf)
+```
+
+#### Appendix 3: The interaction between transfer and year, built for certain types of models
+
+Create new "transfer incoming year" variables to better fit the modeling process:
+
+```{r}
+#incoming_freshman_ids <- df_enhanced |>
+  #filter(changed_team == 1 & exp == "Fr") |>
+  #distinct(id) |>
+  #mutate(transfer_incoming_fr = 1)
+
+#incoming_sophomore_ids <- df_enhanced |>
+  #filter(changed_team == 1 & exp == "So") |>
+  #distinct(id) |>
+  #mutate(transfer_incoming_so = 1)
+
+#incoming_junior_ids <- df_enhanced |>
+  #filter(changed_team == 1 & exp == "Jr") |>
+  #distinct(id) |>
+  #mutate(transfer_incoming_jr = 1)
+
+#incoming_senior_ids <- df_enhanced |>
+  #filter(changed_team == 1 & exp == "Sr") |>
+  #distinct(id) |>
+  #mutate(transfer_incoming_sr = 1)
+
+#incoming_freshman_ids
+#incoming_sophomore_ids
+#incoming_junior_ids
+#incoming_senior_ids
+```
+
+Now rejoin these columns back into the dataset and fill in the NA values:
+
+```{r}
+# https://tidyr.tidyverse.org/reference/replace_na.html
+
+#df_enhanced <- df_enhanced |>
+  #left_join(incoming_freshman_ids, join_by(id)) |>
+  #left_join(incoming_sophomore_ids, join_by(id)) |>
+  #left_join(incoming_junior_ids, join_by(id)) |>
+  #left_join(incoming_senior_ids, join_by(id)) |>
+  # Replace the NA values (for columns not present in the "right" table) with 0
+  #mutate(transfer_incoming_fr = replace_na(transfer_incoming_fr, 0),
+         #transfer_incoming_so = replace_na(transfer_incoming_so, 0),
+         #transfer_incoming_jr = replace_na(transfer_incoming_jr, 0),
+         #transfer_incoming_sr = replace_na(transfer_incoming_sr, 0))
+  
+```
+
+#### Appendix 4 \[WORKING CODE\]: Mismatches between `hoopR` and `cbbdata` packages about team names
 
 I also need to inspect the quality of the join later (such as imperfect matches between school names). However, the join looks quite accurate for now; I will fix these imperfect matches in the near future.
 
@@ -289,13 +427,7 @@ Some special notes about matching (for anyone who wants to ask):
 
 - Both Lafayette College and University of Louisiana at Lafayette compete in NCAA Division I men's basketball, so the matching is less certain in this case!
 
-Finally, I will export the dataframe to a CSV file for later use (This should not be pushed into a public GitHub repo):
-
-```{r}
-write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
-```
-
-#### Bonus: Testing some datasets of team statistics
+#### Appendix 5: Testing some datasets of team statistics
 
 ```{r}
 # Team statistics by month
