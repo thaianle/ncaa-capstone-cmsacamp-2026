@@ -18,7 +18,7 @@ df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
 
 ```
 
-Divide the dataset into transfers and non-transfers
+Divide the dataset into transfers and non-transfers and just do some data cleaning
 
 ```{r}
 df <- df |>
@@ -38,20 +38,36 @@ df <- df |>
                                FALSE)) |>
   ungroup()
 
+transfer_df <- df |>
+  group_by(player) |>
+  filter(n_distinct(team) > 1) |>
+  ungroup()
+
+df <- df |>
+  mutate(has_transferred = player %in% transfer_df$player)
+
 df <- df |>
   filter((prev_year + 1) == year)
 
 df <- df |>
   relocate(prev_team, prev_year, changed_team, year)
 
+# this comes out to 0 meaning there are no year jumps in the data
+df |>
+  filter((prev_year + 1) != year)
+
 # this fixes all the loophole issues we've discovered so far
-
+# this is a dataset of all the players who are not new transfers but there are some where 
+# they have transferred before. i should changed this 
 non_transfers_df <- df |>
-  filter(changed_team == FALSE)
+  filter((has_transferred == FALSE) & (changed_team == FALSE) | (exp == "Fr"))
 
-# this comes out to 0 rows so previous filter is all good
+
 non_transfers_df|>
   filter(prev_team != team)
+
+
+
 ```
 
 get experience levels sorted out (add SSr)
@@ -59,7 +75,8 @@ get experience levels sorted out (add SSr)
 ```{r}
 non_transfers_df <- non_transfers_df |>
   mutate(prev_exp = lag(exp)) |>
-  filter((exp == "Fr") | (exp == "So" & prev_exp == "Fr") | (exp == "Jr" & prev_exp == "So") | (exp == "Sr" & prev_exp == "Jr") | (exp == "Sr"))
+  filter((exp == "Fr") | (exp == "So" & prev_exp == "Fr") | (exp == "Jr" & prev_exp == "So") | (exp == "Sr" & prev_exp == "Jr") | (exp == "Sr" & prev_exp == "Sr"))
+# there are 1770 players between the years 2021-2025 that have never transferred and have stayed in Division 1 their entire collegiate career
 
 non_transfers_df <- non_transfers_df |>
   relocate(prev_exp, exp)
@@ -67,10 +84,9 @@ non_transfers_df <- non_transfers_df |>
 non_transfers_df <- non_transfers_df |>
   mutate(exp = ifelse((exp == "Sr" & prev_exp == "Sr"), "SSr", exp))
 
-
-#non_transfers_df <- non_transfers_df |>
-#  mutate(prev_exp = lag(exp),
-#         exp = ifelse(prev_exp == exp, "SSr", "Sr")) 
+# there are 969 super seniors who have never transferred 
+non_transfers_df |>
+  filter(exp == "SSr")
 
 #non_transfers_df <- non_transfers_df |>
 #  relocate(prev_exp, exp)
@@ -82,9 +98,8 @@ Attempt linear regression
 non_transfers_df <- non_transfers_df |>
   mutate(exp = as.factor(exp))
 
-non_transfers_lm <- lm(ppg ~ exp, data = non_transfers_df)
-tidy(non_transfers_lm, conf.int = TRUE)
-
+#non_transfers_lm <- lm(ppg ~ exp, data = non_transfers_df)
+#tidy(non_transfers_lm, conf.int = TRUE)
 # this compares the average of everyone
 
 non_transfers_df <- non_transfers_df |>
