@@ -1,0 +1,95 @@
+**NBA Age Curve**
+
+Load data and packages
+
+```{r}
+library(cbbdata)
+library(tidyverse)
+library(broom)
+df_2022 <- cbd_torvik_player_season(year = 2022)
+
+df_2023 <- cbd_torvik_player_season(year = 2023)
+
+df_2024 <- cbd_torvik_player_season(year = 2024)
+
+df_2025 <- cbd_torvik_player_season(year = 2025)
+
+df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
+
+```
+
+Divide the dataset into transfers and non-transfers
+
+```{r}
+df <- df |>
+  arrange(id, year) |>
+  group_by(id) |>
+  mutate(prev_team = lag(team),
+         prev_year = lag(year),
+         #if they have a previous team AND 
+         #the year is the one right after the previous year AND 
+         #the team they're on is not the same as the previous team THEN
+         #changed_team is through IF NOT THEN
+         #changed_team is false 
+         changed_team = ifelse(!is.na(prev_team) &
+                                 year == (prev_year + 1) &
+                                 team != prev_team,
+                               TRUE,
+                               FALSE)) |>
+  ungroup()
+
+df <- df |>
+  filter((prev_year + 1) == year)
+
+df <- df |>
+  relocate(prev_team, prev_year, changed_team, year)
+
+# this fixes all the loophole issues we've discovered so far
+
+non_transfers_df <- df |>
+  filter(changed_team == FALSE)
+
+# this comes out to 0 rows so previous filter is all good
+non_transfers_df|>
+  filter(prev_team != team)
+```
+
+get experience levels sorted out (add SSr)
+
+```{r}
+non_transfers_df <- non_transfers_df |>
+  mutate(prev_exp = lag(exp)) |>
+  filter((exp == "Fr") | (exp == "So" & prev_exp == "Fr") | (exp == "Jr" & prev_exp == "So") | (exp == "Sr" & prev_exp == "Jr") | (exp == "Sr"))
+
+non_transfers_df <- non_transfers_df |>
+  relocate(prev_exp, exp)
+
+non_transfers_df <- non_transfers_df |>
+  mutate(exp = ifelse((exp == "Sr" & prev_exp == "Sr"), "SSr", exp))
+
+
+#non_transfers_df <- non_transfers_df |>
+#  mutate(prev_exp = lag(exp),
+#         exp = ifelse(prev_exp == exp, "SSr", "Sr")) 
+
+#non_transfers_df <- non_transfers_df |>
+#  relocate(prev_exp, exp)
+```
+
+Attempt linear regression
+
+```{r}
+non_transfers_df <- non_transfers_df |>
+  mutate(exp = as.factor(exp))
+
+non_transfers_lm <- lm(ppg ~ exp, data = non_transfers_df)
+tidy(non_transfers_lm, conf.int = TRUE)
+
+# this compares the average of everyone
+
+non_transfers_df <- non_transfers_df |>
+  mutate(prev_ppg = lag(ppg))
+
+non_transfers_correct_lm <- lm(ppg ~ prev_ppg + exp, data = non_transfers_df)
+tidy(non_transfers_correct_lm, conf.int = TRUE)
+```
