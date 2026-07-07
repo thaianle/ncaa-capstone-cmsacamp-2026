@@ -5,8 +5,9 @@ library(tidyverse)
 library(broom)
 library(cbbdata)
 library(hoopR)
-library(performance) # More advanced model fit metrics for glms
-library(mgcv) # For tweedie regression in R
+# library(performance) # More advanced model fit metrics for glms
+library(mgcv) # For tweedie regression and GAMs in R
+library(caret) # For tree-based models
 
 df <- read.csv("player_stats.csv")
 df
@@ -61,6 +62,14 @@ nrow(transfers)
 nrow(non_transfers)
 ```
 
+How many `NA` values are there in the dataset of non-transfers (essential variables only)?
+
+```{r}
+colSums(is.na(non_transfers |>
+                select(ppg, prev_ppg, pos, exp, current_barthag,
+                       conf_class, has_transferred)))
+```
+
 We will build a regression model with cross-validation. Our goal is to closely predict performance as much as possible, and no inference is needed at the current stage.
 
 As a reminder, the previous points per game takes the points per game from the last season of the player in NCAA Division I. We also temporarily filter out players in the 2021-22 season (`year == 2022`) because we do not currently have their previous season's points per game.
@@ -89,7 +98,7 @@ We determine the possible training and validation sets as follows, based on the 
 
 For better splits, I may need to get more data from the 2020-21 season on certain metrics, such as previous points per game and previous team rating.
 
-#### 3. Linear regression
+#### 3. Assessing models by deviance explained
 
 According to Lecture 16 slides, with a classic linear regression model, the deviance equals the residual sum of squares (RSS). We can also access the adjusted R^2^ (adjusted pseudo-R^2^ or McFadden's R^2^ in GLMs) to determine the variance or deviance explained by the model.
 
@@ -185,7 +194,81 @@ model_perf_board_2
 
 I randomly found [this link](https://library.virginia.edu/data/articles/getting-started-tweedie-models-0) as a good reference for tweedie regression and its implementation in R.
 
-\[Note that we can also fit generalized linear models with other powerful tree-based algorithms, including XGBoost.\]
+Now we want to know the deviance explained with tree-based models, including: single decision trees, bagging, random forests, and boosting. Model trainings are done with 10-fold cross-validation.
+
+```{r}
+# This function is adapted from the "get_best_result" function from this website:
+# https://daviddalpiaz.github.io/r4sl/the-caret-package.html#regression
+
+model_result_tree <- function(tree_model_var) {
+  
+  # caret_fit$bestTune means the complexity parameter that yields the best results
+  # which() gets the index of that row
+  best <- which(
+    rownames(tree_model_var$results) == rownames(tree_model_var$bestTune)
+    )
+  
+  # Extract the row with the best result using the index
+  # Then, remove the row index number from the dataframe
+  best_result <- tree_model_var$results[best, ]
+  rownames(best_result) <- NULL
+  
+  # Return the performance and add this value into the model performance board
+  perf <- best_result$Rsquared
+  
+  # The rest of the implementation is similar to the model_result function
+  sp_model_name <- deparse(substitute(tree_model_var))
+  current_tibble <- tibble(
+    model_name = sp_model_name,
+    deviance_explained = perf
+  )
+  
+  return(current_tibble)
+}
+```
+
+
+```{r}
+# https://daviddalpiaz.github.io/r4sl/the-caret-package.html#regression
+
+# Single decision trees
+single_tree_1 <- train(ppg ~ prev_ppg, method = "rpart", tuneLength = 50,
+                       trControl = trainControl(method = "cv", number = 10),
+                       data = non_transfers,
+                       na.action = na.omit)
+
+single_tree_2 <- train(ppg ~ prev_ppg + pos + exp,
+                       method = "rpart", tuneLength = 50,
+                       trControl = trainControl(method = "cv", number = 10),
+                       data = non_transfers,
+                       na.action = na.omit)
+
+single_tree_3 <- train(ppg ~ prev_ppg + pos + exp + current_barthag +
+                         conf_class + has_transferred,
+                       method = "rpart", tuneLength = 50,
+                       trControl = trainControl(method = "cv", number = 10),
+                       data = non_transfers_new,
+                       na.action = na.omit)
+
+# Bagging, random forest, and boosting - Coming soon
+
+model_perf_board_3 <- bind_rows(
+  model_perf_board_2,
+  model_result_tree(single_tree_1), model_result_tree(single_tree_2),
+  model_result_tree(single_tree_3)
+  ) |>
+  arrange(desc(deviance_explained))
+
+model_perf_board_3
+```
+
+[COMING SOON]
+
+#### 4. Assessing models by predictive performance
+
+First, I am trying to make the model as accurate as possible in predicting current performance of a player based on their past performance and some other factors. Personally, *(disclaimer: this need to be verified by statistical knowledge)*, variable selection on its own does not matter that much at this stage.
+
+[COMING SOON]
 
 #### Appendix: Using McFadden's adjusted R^2^ to compare between GLMs (WORKING CODE)
 

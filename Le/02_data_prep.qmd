@@ -66,10 +66,11 @@ I also created new columns to better identify the transfer patterns for each stu
 
 ```{r}
 career_transfers_by_player <- transfer_df |>
-  select(id, year, team, conf, conf_class, ppg) |>
+  select(id, year, team, exp, conf, conf_class, ppg) |>
   arrange(id, year) |>
   group_by(id) |>
   mutate(prev_team = lag(team),
+         prev_exp = lag(exp),
          prev_conf = lag(conf),
          prev_conf_class = lag(conf_class),
          prev_ppg = lag(ppg),
@@ -79,7 +80,7 @@ career_transfers_by_player <- transfer_df |>
          cumulative_career_transfers = cumsum(changed_team),
          num_transfers = max(cumulative_career_transfers)) |>
   
-  select(-team, -conf, -conf_class, -ppg)
+  select(-team, -exp, -conf, -conf_class, -ppg)
 
 career_transfers_by_player
 ```
@@ -165,6 +166,33 @@ df_enhanced |>
 
 ```{r}
 df_enhanced
+```
+
+Kendall helped me filter for super-seniors in the dataset, which is also an essential aspect to note related to the loopholes of NCAA transfer rules. The new indicator for super-seniors is denoted as `SSr`.
+
+Note that we do not want to take the data for players in the 2020-21 season and prior because eligibility is heavily affected by the Covid-19 pandemic. Therefore, even if a player is a super-senior in the 2021-22 season, the dataset will still mark them as senior, or `Sr`.
+
+I also created another indicator variable, `no_change_exp`, that yields 1 if the player does not change their experience (`Fr/So/Jr/Sr`) compared to the previous season they played in NCAA Division I, and 0 otherwise. This variable is expected to effectively spot both super-seniors and double freshmen/ sophomores/ juniors due to redshirting or transferring out of Division I.
+
+```{r}
+df_enhanced <- df_enhanced |>
+  mutate(no_change_exp = case_when(
+    exp == prev_exp ~ 1,
+    is.na(prev_exp) ~ 0,
+    TRUE ~ 0
+  )) |>
+  mutate(exp = ifelse(prev_exp == "Sr" & no_change_exp == 1, "SSr", exp))
+
+df_enhanced
+```
+
+Side note: How many players are registered as double freshmen, sophomores, or juniors? (In the following code block, duplicated players are counted as multiple records.)
+
+```{r}
+df_enhanced |>
+  select(id, year, exp, prev_exp, no_change_exp) |>
+  filter(no_change_exp == 1 & prev_exp != "Sr") |>
+  count(prev_exp)
 ```
 
 Next, I will factor team ratings into the player statistics. In the future, I might also factor conference ratings in my model.
@@ -280,7 +308,7 @@ write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
 
 #### Appendix 1: Kendall's original code for the `changed_team` variable
 
-```{r}
+```{r, eval = FALSE}
 # Kendall's original code:
 
 # trying to make transfer out year/transfer in year
@@ -306,7 +334,7 @@ write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
 
 #### Appendix 2: Kendall's original code for team conference classification variables
 
-```{r}
+```{r, eval = FALSE}
 #df_enhanced <- df_enhanced |>
   #mutate(conference_classification = case_when(
     #conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
@@ -317,7 +345,7 @@ write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
   #))
 ```
 
-```{r}
+```{r, eval = FALSE}
 # bar graph for transfer players by conference
 #df_enhanced <- df_enhanced |>
   #mutate(prev_conf_class = lag(conference_classification))
@@ -336,7 +364,7 @@ write.csv(df_enhanced, "player_stats.csv", row.names = FALSE)
 
 Create new "transfer incoming year" variables to better fit the modeling process:
 
-```{r}
+```{r, eval = FALSE}
 #incoming_freshman_ids <- df_enhanced |>
   #filter(changed_team == 1 & exp == "Fr") |>
   #distinct(id) |>
@@ -365,7 +393,7 @@ Create new "transfer incoming year" variables to better fit the modeling process
 
 Now rejoin these columns back into the dataset and fill in the NA values:
 
-```{r}
+```{r, eval = FALSE}
 # https://tidyr.tidyverse.org/reference/replace_na.html
 
 #df_enhanced <- df_enhanced |>
@@ -385,7 +413,7 @@ Now rejoin these columns back into the dataset and fill in the NA values:
 
 I also need to inspect the quality of the join later (such as imperfect matches between school names). However, the join looks quite accurate for now; I will fix these imperfect matches in the near future.
 
-```{r}
+```{r, eval = FALSE}
 # Look at NA values in the current T-Rank ratings:
 
 # Filtered by team and year
@@ -429,25 +457,25 @@ Some special notes about matching (for anyone who wants to ask):
 
 #### Appendix 5: Testing some datasets of team statistics
 
-```{r}
+```{r, eval = FALSE}
 # Team statistics by month
 df2 <- try(cbd_torvik_team_split(year = 2022, split = "game_result"))
 df2
 table(df2$type)
 ```
 
-```{r}
+```{r, eval = FALSE}
 df3 <- try(cbd_torvik_ncaa_results(min_year=2022, max_year=2025, type='team'))
 df3
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Note that the Barthag ratings are only available before 2025...
 df4 <- try(cbd_torvik_ratings(year = 2024))
 df4
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Confirmation that year = 2023 represents the 2022-23 season
 # Other years also apply the similar rule
 df_games <- try(cbd_torvik_game_box(year = 2023))
@@ -456,7 +484,7 @@ min(df_games$date)
 max(df_games$date)
 ```
 
-```{r}
+```{r, eval = FALSE}
 # https://stackoverflow.com/questions/18931006/how-to-suppress-warning-messages-when-loading-a-library
 
 # Note that you should download the package using the install.github command

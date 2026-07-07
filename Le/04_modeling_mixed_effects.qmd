@@ -1,0 +1,118 @@
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+
+library(tidyverse)
+library(broom)
+library(cbbdata)
+library(hoopR)
+library(lme4) # For mixed effects models
+library(gtsummary) # Display the results of mixed effects models (tidy doesn't work)
+
+df <- read.csv("player_stats.csv")
+df
+```
+
+```{r}
+# Change necessary variable data types for the models to work properly
+df <- df |>
+  mutate(id = as.factor(id),
+         player = as.factor(player),
+         pos = as.factor(pos),
+         exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr", "SSr")))
+```
+
+```{r}
+# Split the data to transfers and non-transfers based on the variable `changed_team`
+
+transfers <- df |>
+  filter(changed_team == 1) |>
+  filter(year > 2022)
+
+non_transfers <- df |>
+  filter(changed_team != 1 | is.na(changed_team)) |>
+  filter(year > 2022)
+
+nrow(transfers)
+nrow(non_transfers)
+```
+
+First, I will fit some classic linear regression models. The covariates that I will consider in my model, thanks to the advisor's help, are:
+
+- Team ratings
+- Player ratings *(need work)*
+- Position *(wait for Kendall)*
+- Conference
+- Experience level (may be duplicated)
+- Year/Season
+
+```{r}
+# The simplest linear regression model
+linreg_1 <- lm(ppg ~ prev_ppg, data = non_transfers)
+tidy(linreg_1, conf.int = TRUE)
+```
+
+```{r}
+# Multiple linear regression model (note the assumptions)
+# This will take a lot of time because there are too many parameters to fit
+linreg_2 <- lm(ppg ~ prev_ppg + id + team + pos + exp + conf +
+                 year + current_barthag,
+               data = non_transfers)
+
+# Filter for the necessary terms to avoid showing too many parameters
+tidy(linreg_2, conf.int = TRUE) |>
+  filter(term %in% c("(Intercept)", "prev_ppg", "year", "current_barthag"))
+```
+
+```{r}
+# Check for heteroskedasticity; also take a while to run because of many parameters
+# Code taken from Lecture 23 slides
+augment(linreg_2) |>
+  ggplot(aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Fitted value", y = "Residual")+
+  geom_hline(linetype = "dashed", color = "red", yintercept = 0)
+```
+
+```{r}
+# Is the slope in the residual plot significantly different from zero?
+augmented_linreg <- augment(linreg_2)
+linreg_check <- lm(.resid ~ .fitted, data = augmented_linreg)
+tidy(linreg_check, conf.int = TRUE)
+```
+
+The p-value is very high (approximately equal to 1), so the residual trends in the dataset does not show significant deviation from zero.
+
+```{r}
+# ADDITIONAL DIAGNOSTICS WITH QQ PLOTS
+```
+
+#### 1. Mixed effects model with random intercepts
+
+Random intercepts (random effects) in player and team level, fixed effects in conference level.
+
+```{r}
+# https://stackoverflow.com/questions/67123529/how-to-include-nested-effects-in-mixed-effect-model-with-lme4-package
+mixed_effects_1 <- lmer(ppg ~ prev_ppg + pos + exp + conf +
+                 year + current_barthag + (1|id/team),
+               data = non_transfers)
+
+tbl_regression(mixed_effects_1)
+```
+
+Is the random effects even necessary at all, using an ANOVA test?
+
+```{r}
+# ANOVA TEST CODE HERE
+```
+
+#### 2. Mixed effects model with random slopes
+
+For the initial set-up, I will add random slopes to player and team level, and still fixed effects in conference level.
+
+[COMING SOON]
+
+#### Appendix: GAMs to estimate the direction of relationship between current points per game with other useful predictors
+
+[COMING SOON]
