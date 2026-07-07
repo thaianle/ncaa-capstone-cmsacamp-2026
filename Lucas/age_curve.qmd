@@ -6,6 +6,8 @@ Load data and packages
 library(cbbdata)
 library(tidyverse)
 library(broom)
+library(hoopR)
+install.packages("hoopR", repos = c("https://sportsdataverse.r-universe.dev", "https://cloud.r-project.org"))
 df_2022 <- cbd_torvik_player_season(year = 2022)
 
 df_2023 <- cbd_torvik_player_season(year = 2023)
@@ -15,6 +17,11 @@ df_2024 <- cbd_torvik_player_season(year = 2024)
 df_2025 <- cbd_torvik_player_season(year = 2025)
 
 df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
+
+df_team_ratings_2022 <- torvik_ratings(year = 2022)
+df_team_ratings_2023 <- torvik_ratings(year = 2023)
+df_team_ratings_2024 <- torvik_ratings(year = 2024)
+df_team_ratings_2025 <- torvik_ratings(year = 2025)
 
 ```
 
@@ -107,4 +114,9 @@ non_transfers_df <- non_transfers_df |>
 
 non_transfers_correct_lm <- lm(ppg ~ prev_ppg + exp, data = non_transfers_df)
 tidy(non_transfers_correct_lm, conf.int = TRUE)
+
+# variables to use as predictors: 
+
+
+
 ```
