@@ -7,7 +7,7 @@ library(cbbdata)
 library(tidyverse)
 library(broom)
 library(hoopR)
-install.packages("hoopR", repos = c("https://sportsdataverse.r-universe.dev", "https://cloud.r-project.org"))
+#install.packages("hoopR", repos = c("https://sportsdataverse.r-universe.dev", "https#://cloud.r-project.org"))
 df_2022 <- cbd_torvik_player_season(year = 2022)
 
 df_2023 <- cbd_torvik_player_season(year = 2023)
@@ -22,6 +22,9 @@ df_team_ratings_2022 <- torvik_ratings(year = 2022)
 df_team_ratings_2023 <- torvik_ratings(year = 2023)
 df_team_ratings_2024 <- torvik_ratings(year = 2024)
 df_team_ratings_2025 <- torvik_ratings(year = 2025)
+
+ratings_df <- bind_rows(df_team_ratings_2022, df_team_ratings_2023, 
+                        df_team_ratings_2024, df_team_ratings_2025)
 
 ```
 
@@ -54,14 +57,14 @@ df <- df |>
   mutate(has_transferred = player %in% transfer_df$player)
 
 df <- df |>
-  filter((prev_year + 1) == year)
+  filter((((prev_year + 1) == year)) | (year == 2022))
 
 df <- df |>
   relocate(prev_team, prev_year, changed_team, year)
 
 # this comes out to 0 meaning there are no year jumps in the data
-df |>
-  filter((prev_year + 1) != year)
+#df |>
+#  filter((prev_year + 1) != year)
 
 # this fixes all the loophole issues we've discovered so far
 # this is a dataset of all the players who are not new transfers but there are some where 
@@ -70,8 +73,8 @@ non_transfers_df <- df |>
   filter((has_transferred == FALSE) & (changed_team == FALSE) | (exp == "Fr"))
 
 
-non_transfers_df|>
-  filter(prev_team != team)
+#non_transfers_df|>
+#  filter(prev_team != team)
 
 
 
@@ -83,7 +86,7 @@ get experience levels sorted out (add SSr)
 non_transfers_df <- non_transfers_df |>
   mutate(prev_exp = lag(exp)) |>
   filter((exp == "Fr") | (exp == "So" & prev_exp == "Fr") | (exp == "Jr" & prev_exp == "So") | (exp == "Sr" & prev_exp == "Jr") | (exp == "Sr" & prev_exp == "Sr"))
-# there are 1770 players between the years 2021-2025 that have never transferred and have stayed in Division 1 their entire collegiate career
+# there are 5257 players between the years 2021-2025 that have never transferred and have stayed in Division 1 their entire collegiate career
 
 non_transfers_df <- non_transfers_df |>
   relocate(prev_exp, exp)
@@ -91,19 +94,93 @@ non_transfers_df <- non_transfers_df |>
 non_transfers_df <- non_transfers_df |>
   mutate(exp = ifelse((exp == "Sr" & prev_exp == "Sr"), "SSr", exp))
 
-# there are 969 super seniors who have never transferred 
-non_transfers_df |>
-  filter(exp == "SSr")
+non_transfers_df <- non_transfers_df |>
+  mutate(exp = as.factor(exp))
+
+# there are 1571 super seniors who have never transferred 
+#non_transfers_df |>
+#  filter(exp == "SSr")
 
 #non_transfers_df <- non_transfers_df |>
 #  relocate(prev_exp, exp)
 ```
 
-Attempt linear regression
+Add relevant variables
 
 ```{r}
+# add team ranking
+ratings_df <- ratings_df |>
+  select(barthag_rk, year, team)
+
 non_transfers_df <- non_transfers_df |>
-  mutate(exp = as.factor(exp))
+  left_join(ratings_df, by = c("team", "year"))
+
+# add only 3 positions
+
+#non_transfers_df |>
+#  distinct(pos)
+
+# forward = Wing F, Stretch 4, PF/C
+# center = C
+# guard = Combo G, Scoring PG, Wing G, Pure PG 
+
+non_transfers_df <- non_transfers_df |>
+  mutate(pos = case_when(
+    pos %in% c("Wing F", "Stretch 4", "PF/C") ~ "forward",
+    pos == "C" ~ "center",
+    pos %in% c("Combo G", "Scoring PG", "Wing G", "Pure PG") ~ "guard"
+  ))
+
+# getting column with years of experience in the NCAA Division 1
+# jk we don't need this
+# non_transfers_df <- non_transfers_df |>
+#   mutate(prev_prev_year = lag(prev_year),
+#          prev_prev_prev_year = lag(prev_prev_year)) |>
+#   mutate(years_in_ncaa = case_when(
+#     is.na(prev_year) ~ 1,
+#     is.na(prev_prev_year) == NA ~ 2,
+#     is.na(prev_prev_prev_year) == NA ~ 3, 
+#     TRUE ~ 4
+#   ))
+# 
+# non_transfers_df <- non_transfers_df |>
+#   relocate(years_in_ncaa)
+
+# attempt to find 6th years
+
+
+
+# there are 10 players within non_transfers_df that played a 6 year
+# there are 409 players within non_transfers_df that played 5 years
+# i will just lump them all in with super senior (aka SSr)
+
+non_transfers_df <- non_transfers_df |>
+  mutate(prev_ppg = lag(ppg))
+
+non_transfers_df <- non_transfers_df |>
+  relocate(prev_ppg)
+
+
+non_transfers_df <- non_transfers_df |>
+  mutate(prev_ppg = ifelse(exp == "Fr", NA, prev_ppg),
+         prev_exp = ifelse(exp == "Fr", NA, prev_exp))
+
+non_transfers_df |>
+  filter(exp == "Fr")
+
+# there are 13 double freshmen
+# non_transfers_df |>
+#  filter(exp == "Fr") |>
+#  group_by(id) |>
+#  summarise(freq = n()) |>
+#  arrange(desc(freq)) |>
+#  filter(freq > 1)
+```
+
+Attempt simple linear regression
+
+```{r}
+
 
 #non_transfers_lm <- lm(ppg ~ exp, data = non_transfers_df)
 #tidy(non_transfers_lm, conf.int = TRUE)
@@ -115,8 +192,14 @@ non_transfers_df <- non_transfers_df |>
 non_transfers_correct_lm <- lm(ppg ~ prev_ppg + exp, data = non_transfers_df)
 tidy(non_transfers_correct_lm, conf.int = TRUE)
 
-# variables to use as predictors: 
+# variables to use as predictors: team, team rank, position, conference, exp (of course), 
+# previous points per game
 
+# change correct variables to factor
+non_transfers_df <- non_transfers_df |>
+  mutate(across(c(team, pos, conf, exp), as.factor))
 
+non_transfers_2_lm <- lm(ppg ~ prev_ppg + exp + barthag_rk + pos, data = non_transfers_df)
 
+summary(non_transfers_2_lm)
 ```
