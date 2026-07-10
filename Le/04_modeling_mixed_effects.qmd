@@ -8,6 +8,7 @@ library(cbbdata)
 library(hoopR)
 library(lme4) # For mixed effects models
 library(gtsummary) # Display the results of mixed effects models (tidy doesn't work)
+library(mgcv) # For GAMs in R
 
 df <- read.csv("player_stats.csv")
 df
@@ -104,15 +105,212 @@ tbl_regression(mixed_effects_1)
 Is the random effects even necessary at all, using an ANOVA test?
 
 ```{r}
-# ANOVA TEST CODE HERE
+comparison_lm_1 <- lm(ppg ~ prev_ppg + pos + exp + conf + year + current_barthag + id + team,
+                      data = non_transfers)
+comparison_mixed_1 <- lmer(ppg ~ prev_ppg + pos + exp + conf +
+                             year + current_barthag + (1|id/team),
+                           data = non_transfers, REML = FALSE)
+anova(comparison_mixed_1, comparison_lm_1)
+```
+
+```{r}
+# Note that nested models in lme4 should be specified from top to bottom level
+comparison_lm_1 <- lm(ppg ~ prev_ppg + pos + exp + year + current_barthag,
+                      data = non_transfers)
+
+comparison_mixed_1 <- lmer(ppg ~ prev_ppg + pos + exp +
+                             year + current_barthag + (1|id),
+                           data = non_transfers, REML = FALSE)
+
+comparison_mixed_2 <- lmer(ppg ~ prev_ppg + pos + exp +
+                             year + current_barthag + (1|team/id),
+                           data = non_transfers, REML = FALSE)
+
+comparison_mixed_3 <- lmer(ppg ~ prev_ppg + pos + exp +
+                             year + current_barthag + (1|conf/team/id),
+                           data = non_transfers, REML = FALSE)
+
+# Extract p-value from ANOVA tests
+print("ANOVA p-value results between mixed effects models and fixed effects models:")
+anova(comparison_mixed_1, comparison_lm_1)$`Pr(>Chisq)`[2]
+anova(comparison_mixed_2, comparison_lm_1)$`Pr(>Chisq)`[2]
+anova(comparison_mixed_3, comparison_lm_1)$`Pr(>Chisq)`[2]
+print("")
+print("ANOVA p-value results between different mixed effects models together:")
+anova(comparison_mixed_1, comparison_mixed_2)$`Pr(>Chisq)`[2]
+anova(comparison_mixed_2, comparison_mixed_3)$`Pr(>Chisq)`[2]
+```
+
+See [this link](https://stats.stackexchange.com/questions/114901/should-i-exclude-random-effects-from-a-model-if-they-are-not-statistically-signi) for some explanation of whether random effects is valid.
+
+```{r}
+lme4:::anova.merMod(comparison_mixed_1)
 ```
 
 #### 2. Mixed effects model with random slopes
 
 For the initial set-up, I will add random slopes to player and team level, and still fixed effects in conference level.
 
-[COMING SOON]
+```{r}
+#random_slopes <- lmer(ppg ~ prev_ppg + pos + exp + conf +
+                        #year + current_barthag + (1 + prev_ppg| id/team),
+                        #data = non_transfers)
+#tbl_regression(random_slopes)
+
+# Error: number of observations (=2214) <= number of random effects (=3776) for term (1 +
+# prev_ppg | team:id); the random-effects parameters and the residual variance (or scale
+# parameter) are probably unidentifiable
+
+random_slopes_1 <- lmer(ppg ~ prev_ppg + pos + exp + conf +
+                          year + current_barthag + (1 | id/team) + (1 + prev_ppg | team),
+                        data = non_transfers)
+tbl_regression(random_slopes_1)
+```
+
+#### 3. Applying the mixed effects model for the transferred players
+
+```{r}
+# https://optimumsportsperformance.com/blog/making-predictions-from-a-mixed-model-using-r/
+# Select necessary columns from the transfers dataset
+
+mixed_effects_1 <- lmer(ppg ~ prev_ppg + pos + exp + conf +
+                          year + current_barthag + (1|id/team),
+                        data = non_transfers)
+
+transfers_subset <- transfers |>
+  select(ppg, prev_ppg, pos, exp, conf, year, current_barthag, id, team)
+
+transfers_augment <- predict(mixed_effects_1, newdata = transfers_subset, re.form = NA)
+
+error_dataset <- transfers_subset |>
+  mutate(expected_ppg = transfers_augment) |>
+  mutate(prediction_error = ppg - expected_ppg) |>
+  select(id, year, ppg, expected_ppg, prediction_error) |>
+  arrange(desc(prediction_error))
+
+error_dataset
+```
+
+```{r}
+# The errors closely follow a normal distribution
+# https://statisticsglobe.com/normal-density-curve-on-top-of-histogram-ggplot2-r
+
+# after_stat(density) is used to convert the histogram from raw counts to density
+
+error_dataset |>
+  ggplot(aes(x = prediction_error)) +
+  geom_histogram(aes(y = after_stat(density))) +
+  geom_vline(xintercept = 0, color = "red", linewidth = 1, linetype = "dashed") +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(error_dataset$prediction_error),
+                            sd = sd(error_dataset$prediction_error)),
+                color = "darkred",
+                size = 1.5)
+```
+
+For better demonstration, we can also draw a normal distribution curve on top of this histogram and use some statistical tests to demonstrate that the distribution is normal.
+
+```{r}
+# Test if the prediction errors actually follow a normal distribution
+library(dgof)
+ks.test(error_dataset$prediction_error, "pnorm")
+```
+
+```{r}
+error_dataset |>
+  ggplot(aes(x = ppg, y = expected_ppg)) +
+  geom_point() + coord_fixed() +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5)
+```
+
+```{r}
+error_dataset |>
+  ggplot(aes(x = ppg, y = prediction_error)) +
+  geom_point(alpha = 0.3) + coord_fixed() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red", linewidth = 1, linetype = "dashed")
+```
+
+Players with higher actual points per game tend to be over-predicted.
+
+```{r}
+error_dataset |>
+  ggplot(aes(x = expected_ppg, y = prediction_error)) +
+  geom_point(alpha = 0.3) + coord_fixed() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red", linewidth = 1, linetype = "dashed")
+```
+
+We can also make a "reverse EDA" to analyze errors:
+
+```{r}
+transfers_prediction_errors <- error_dataset |>
+  left_join(df, join_by(id, year, ppg))
+
+transfers_prediction_errors
+```
+
+Box plot of prediction errors with different categorical variables:
+
+```{r}
+# Differences in experience level
+transfers_prediction_errors |>
+  ggplot(aes(x = exp, y = prediction_error)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, color = "red", linewidth = 1, linetype = "dashed")
+```
+
+```{r}
+# Differences in position
+transfers_prediction_errors |>
+  ggplot(aes(x = pos, y = prediction_error)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, color = "red", linewidth = 1, linetype = "dashed")
+```
+
+```{r}
+# Differences in conference classification
+transfers_prediction_errors |>
+  mutate(conf_class = factor(conf_class, levels = c("low-major", "mid-major", "high-major"))) |>
+  ggplot(aes(x = conf_class, y = prediction_error)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, color = "red", linewidth = 1, linetype = "dashed")
+```
+
+The difference in conference classification plot is very interesting! The prediction error is somewhat negatively biased when the players advance to high-major classifications.
 
 #### Appendix: GAMs to estimate the direction of relationship between current points per game with other useful predictors
 
-[COMING SOON]
+```{r}
+gam_1 <- gam(ppg ~ s(prev_ppg) + s(current_barthag) + pos + exp + conf + year,
+             data = non_transfers, family = gaussian(link = "identity"))
+```
+
+```{r}
+library(gratia)
+draw(gam_1)
+```
+
+#### Appendix: Summary of the mixed effects reports
+
+```{r}
+summary(mixed_effects_1)
+```
+
+```{r}
+#non_transfers |>
+  #ggplot(aes(x = ppg)) +
+  #geom_histogram()
+
+summary(non_transfers$ppg)
+```
+
+```{r}
+mixed_effects_conf <- lmer(ppg ~ prev_ppg + pos + exp + team +
+                             year + current_barthag + (1|id),
+                           data = non_transfers)
+
+summary(mixed_effects_conf)
+```
+
