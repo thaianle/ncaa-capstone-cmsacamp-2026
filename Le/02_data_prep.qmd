@@ -5,8 +5,6 @@ library(cbbdata)
 library(hoopR)
 ```
 
-#### 1. Dataset for player statistics by season
-
 ```{r}
 # Read the player stats by season dataset
 df_2022 <- torvik_player_stats(year = 2022)
@@ -28,22 +26,41 @@ df <- df |>
 df
 ```
 
-Update the conference classification and previous conference to the dataset (code by Kendall):
+#### 1. Recoding values
+
+In this data preparation, we will do the following:
+
+- Update the conference classification and previous conference to the dataset.
+
+- For simplicity in models, we will recode the experience level of each college athletes as a numeric value from 1 to 4, where 1 corresponds to Freshman (`Fr`) and 4 corresponds to Senior (`Sr`). Later in the code, we will add level 5 called Super-senior (`SSr`).
 
 ```{r}
 df_enhanced <- df |>
   # Move the unique player ID to the front for readability first
   relocate(id) |>
-  mutate(conf_class = case_when(
-    conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
-    conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
-    conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
-              "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
-              "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
-  ))
+  mutate(
+    # Update the conference classification (code by Kendall)
+    conf_class = case_when(
+      conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
+      conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
+      conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
+                  "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
+                  "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
+    ),
+    # Recode the experience level (note that we are wrapping the result as strings
+    # so that case_when can work properly)
+    exp = case_when(
+      exp == "Fr" ~ "1", exp == "So" ~ "2", exp == "Jr" ~ "3",
+      exp == "Sr" ~ "4", TRUE ~ exp
+      )
+    ) |>
+  # Convert experience level to numeric
+  mutate(exp = as.numeric(exp))
 
 df_enhanced
 ```
+
+#### 2. Indicators for players' transfer history
 
 Kendall helped me with the code for the `has_transferred` and `changed_team` variables!
 
@@ -147,6 +164,8 @@ df_enhanced
 
 We can check the code's accuracy by filtering the current `df_enhanced` dataset for a particular player ID that transfers the most, such as `65627` and `70342`.
 
+#### 3. Experience level (class year) of the college athletes
+
 Filling in the experience level for the remaining players:
 
 - Jason Umosella (La Salle University): Freshman (as of 2024-25) ([link](https://goexplorers.com/sports/mens-basketball/roster/jason-umosella/12302))
@@ -154,14 +173,14 @@ Filling in the experience level for the remaining players:
 
 ```{r}
 df_enhanced |>
-  filter(!(exp %in% c("Fr", "So", "Jr", "Sr")))
+  filter(!(exp %in% c(1, 2, 3, 4)))
 ```
 
 ```{r}
 df_enhanced <- df_enhanced |>
   mutate(exp = case_when(
-    player == "Jason Umosella" & year == 2025 ~ "Fr",
-    player == "Alvin Stredic" & year == 2023 ~ "Jr",
+    player == "Jason Umosella" & year == 2025 ~ 1,
+    player == "Alvin Stredic" & year == 2023 ~ 3,
     TRUE ~ exp
   ))
 
@@ -178,11 +197,11 @@ df_enhanced |>
 df_enhanced
 ```
 
-Kendall helped me filter for super-seniors in the dataset, which is also an essential aspect to note related to the loopholes of NCAA transfer rules. The new indicator for super-seniors is denoted as `SSr`.
+Kendall helped me filter for super-seniors in the dataset, which is also an essential aspect to note related to the loopholes of NCAA transfer rules. The new numeric indicator for super-seniors is denoted as `5`.
 
-Note that we do not want to take the data for players in the 2020-21 season and prior because eligibility is heavily affected by the Covid-19 pandemic. Therefore, even if a player is a super-senior in the 2021-22 season, the dataset will still mark them as senior, or `Sr`.
+Note that we do not want to take the data for players in the 2020-21 season and prior because eligibility is heavily affected by the Covid-19 pandemic. Therefore, even if a player is a super-senior in the 2021-22 season, the dataset will still mark them as senior, or `4`.
 
-I also created another indicator variable, `no_change_exp`, that yields 1 if the player does not change their experience (`Fr/So/Jr/Sr`) compared to the previous season they played in NCAA Division I, and 0 otherwise. This variable is expected to effectively spot both super-seniors and double freshmen/ sophomores/ juniors due to redshirting or transferring out of Division I.
+I also created another indicator variable, `no_change_exp`, that yields 1 if the player does not change their experience level compared to the previous season they played in NCAA Division I, and 0 otherwise. This variable is expected to effectively spot both super-seniors and double freshmen/ sophomores/ juniors due to redshirting or transferring out of Division I.
 
 ```{r}
 df_enhanced <- df_enhanced |>
@@ -191,7 +210,7 @@ df_enhanced <- df_enhanced |>
     is.na(prev_exp) ~ 0,
     TRUE ~ 0
   )) |>
-  mutate(exp = ifelse(prev_exp == "Sr" & no_change_exp == 1, "SSr", exp))
+  mutate(exp = ifelse(prev_exp == 4 & no_change_exp == 1, 5, exp))
 
 df_enhanced
 ```
@@ -201,9 +220,11 @@ Side note: How many players are registered as double freshmen, sophomores, or ju
 ```{r}
 df_enhanced |>
   select(id, year, exp, prev_exp, no_change_exp) |>
-  filter(no_change_exp == 1 & prev_exp != "Sr") |>
+  filter(no_change_exp == 1 & prev_exp != 4) |>
   count(prev_exp)
 ```
+
+#### 4. Add team ratings
 
 Next, I will factor team ratings into the player statistics. In the future, I might also factor conference ratings in my model.
 
@@ -227,9 +248,11 @@ df_team_ratings_2026 <- torvik_ratings(year = 2026)
 # dataset, `df_enhanced`; so we need to change their names to merge these two
 # datasets better
 
-df_team_ratings <- bind_rows(df_team_ratings_2022, df_team_ratings_2023,
+df_team_ratings_full <- bind_rows(df_team_ratings_2022, df_team_ratings_2023,
                              df_team_ratings_2024, df_team_ratings_2025,
-                             df_team_ratings_2026) |>
+                             df_team_ratings_2026)
+
+df_team_ratings <- df_team_ratings_full |>
   select(year, team, barthag)
 
 df_team_ratings
@@ -279,6 +302,46 @@ df_enhanced <- df_enhanced |>
 
 df_enhanced
 ```
+
+I will also add the conference's average Barthag rating in the current year (`current_barthag_conf`) and the same conference's average Barthag rating in the previous year (`prev_barthag_current_conf`) as an indicator of the conference's overall competitiveness.
+
+```{r}
+conference_ratings <- df_team_ratings_full |>
+  select(year, conf, barthag) |>
+  group_by(year, conf) |>
+  summarize(barthag_conf = mean(barthag)) |>
+  ungroup() |>
+  # I will also arrange conferences based on descending ratings for each year
+  arrange(year, desc(barthag_conf))
+
+conference_ratings
+```
+
+```{r}
+df_enhanced <- df_enhanced |>
+  # Add the conference rating in the current season
+  left_join(conference_ratings, join_by(year, conf)) |>
+  rename(current_barthag_conf = barthag_conf) |>
+  # Add the conference rating of the current conference in the previous season
+  left_join(conference_ratings, join_by(prev_year == year, conf)) |>
+  rename(prev_barthag_current_conf = barthag_conf)
+
+df_enhanced
+```
+
+Side note: How does the Barthag rating correlate with the traditional classification of NCAA Division I conferences into high-major, mid-major, and low-major?
+
+```{r}
+df_enhanced |>
+  select(year, conf, conf_class, current_barthag_conf) |>
+  distinct(year, conf, .keep_all = TRUE) |>
+  mutate(conf_class = factor(conf_class, levels = c("high-major", "mid-major", "low-major"))) |>
+  ggplot(aes(x = conf_class, y = current_barthag_conf)) +
+  geom_boxplot() +
+  facet_wrap(~ year)
+```
+
+#### Final step
 
 Finally, I will export the dataframe to a CSV file for later use (This should not be pushed into a public GitHub repo):
 
