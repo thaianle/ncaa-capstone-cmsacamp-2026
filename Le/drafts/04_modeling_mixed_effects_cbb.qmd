@@ -10,7 +10,7 @@ library(lme4) # For mixed effects models
 library(gtsummary) # Display the results of mixed effects models (tidy doesn't work)
 library(mgcv) # For GAMs in R
 
-df <- read.csv("player_stats_hoopR.csv")
+df <- read.csv("player_stats.csv")
 df
 ```
 
@@ -202,13 +202,11 @@ error_dataset |>
   geom_histogram(aes(y = after_stat(density))) +
   geom_vline(xintercept = 0, color = "red", linewidth = 1, linetype = "dashed") +
   stat_function(fun = dnorm,
-                args = list(mean = mean(error_dataset$prediction_error, na.rm = TRUE),
-                            sd = sd(error_dataset$prediction_error, na.rm = TRUE)),
+                args = list(mean = mean(error_dataset$prediction_error),
+                            sd = sd(error_dataset$prediction_error)),
                 color = "darkred",
                 size = 1.5)
 ```
-
-Note that there is an observation with `NA` points per game `(ID = 70333, year = 2023)`. I might clean this up later while I am refining my analysis.
 
 For better demonstration, we can also draw a normal distribution curve on top of this histogram and use some statistical tests to demonstrate that the distribution is normal.
 
@@ -315,3 +313,4 @@ mixed_effects_conf <- lmer(ppg ~ prev_ppg + pos + exp + team +
 
 summary(mixed_effects_conf)
 ```
+

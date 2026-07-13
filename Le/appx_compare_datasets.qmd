@@ -1,0 +1,73 @@
+This is a supplementary file where I compared between the data obtained from `cbbdata` package and the `hoopR` package. Both of them extracts data from the Bart Torvik API, but `hoopR` is more updated and is currently maintained compared to the other package. There are actually naming differences that impact some crucial analysis results.
+
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+
+library(tidyverse)
+library(broom)
+library(cbbdata)
+library(hoopR)
+library(lme4) # For mixed effects models
+library(gtsummary) # Display the results of mixed effects models (tidy doesn't work)
+library(mgcv) # For GAMs in R
+
+df_cbb <- read.csv("player_stats.csv")
+df_hoopR <- read.csv("player_stats_hoopR.csv")
+```
+
+```{r}
+df_cbb
+df_hoopR
+```
+
+Sort and standardize the two datasets:
+
+```{r}
+df_cbb2 <- df_cbb |>
+  select(id, player, year, pos, exp, team, conf, ppg) |>
+  arrange(id, year) |>
+  # Adjust for naming differences between two datasets
+  mutate(team = case_when(
+    team ==  "College of Charleston" ~ "Charleston",
+    team == "LIU Brooklyn" ~ "LIU",
+    team == "North Carolina St." ~ "North Carolina",
+    team == "Fort Wayne" ~ "Purdue Fort Wayne",
+    team == "Texas A&M Commerce" ~ "East Texas A&M",
+    team == "Detroit" ~ "Detroit Mercy",
+    team == "St. Francis PA" ~ "Saint Francis",
+    team == "Louisiana Lafayette" ~ "Louisiana",
+    team == "IUPUI" ~ "IU Indy",
+    TRUE ~ team
+  ))
+
+df_cbb2
+```
+
+```{r}
+df_hoopR2 <- df_hoopR |>
+  select(id, player, year, pos, exp, team, conf, ppg) |>
+  arrange(id, year) |>
+  filter(year != 2026)
+
+df_hoopR2
+```
+
+```{r}
+setdiff(df_cbb2, df_hoopR2) |>
+  select(id, player, year, pos, exp, team) |>
+  arrange(id, year)
+```
+
+```{r}
+setdiff(df_hoopR2, df_cbb2) |>
+  select(id, player, year, pos, exp, team) |>
+  arrange(id, year)
+```
+
+```{r}
+df_hoopR2 |>
+  filter(team == "N.C. State" | team == "North Carolina")
+```
+
+Note that I might have made an error when filtering for the `cbbdata` dataset: I confused University of North Carolina and North Carolina State University.
