@@ -7,6 +7,7 @@ library(cbbdata)
 library(tidyverse)
 library(broom)
 library(hoopR)
+library(gt)
 #install.packages("hoopR", repos = c("https://sportsdataverse.r-universe.dev", "https#://cloud.r-project.org"))
 df_2022 <- cbd_torvik_player_season(year = 2022)
 
@@ -16,16 +17,62 @@ df_2024 <- cbd_torvik_player_season(year = 2024)
 
 df_2025 <- cbd_torvik_player_season(year = 2025)
 
+df_2026 <- cbd_torvik_player_season(year = 2026)
+
 df <- bind_rows(df_2022, df_2023, df_2024, df_2025)
 
-df_team_ratings_2022 <- torvik_ratings(year = 2022)
-df_team_ratings_2023 <- torvik_ratings(year = 2023)
-df_team_ratings_2024 <- torvik_ratings(year = 2024)
-df_team_ratings_2025 <- torvik_ratings(year = 2025)
 
-ratings_df <- bind_rows(df_team_ratings_2022, df_team_ratings_2023, 
-                        df_team_ratings_2024, df_team_ratings_2025)
+```
 
+ratings table for 2021-2026
+
+```{r}
+
+#df_team_ratings_2022 <- torvik_ratings(year = 2022)
+#df_team_ratings_2023 <- torvik_ratings(year = 2023)
+#df_team_ratings_2024 <- torvik_ratings(year = 2024)
+#df_team_ratings_2025 <- torvik_ratings(year = 2025)
+#df_team_ratings_2026 <- torvik_ratings(year = 2026)
+
+#ratings_df <- bind_rows(df_team_ratings_2022, df_team_ratings_2023, 
+#                        df_team_ratings_2024, df_team_ratings_2025)
+
+torvik_ratings_all <- bind_rows(
+  torvik_ratings(year = 2021) |> mutate(season = 2021),
+  torvik_ratings(year = 2022) |> mutate(season = 2022),
+  torvik_ratings(year = 2023) |> mutate(season = 2023),
+  torvik_ratings(year = 2024) |> mutate(season = 2024),
+  torvik_ratings(year = 2025) |> mutate(season = 2025)
+)
+
+url_2021 <- "http://barttorvik.com/2021_team_results.csv"
+url_2026 <- "http://barttorvik.com/2026_team_results.csv"
+torvik_2021 <- read_csv(url_2021, col_names = FALSE)
+torvik_2026 <- read_csv(url_2026, col_names = FALSE)
+
+
+torvik_raw_2021 <- torvik_2021 |> 
+  slice(-1) |>
+  select(
+    rank = X1, 
+    team = X2) |>
+  mutate(rank = as.integer(rank),
+         year = 2021)
+
+torvik_raw_2026 <- torvik_2026 |> 
+  slice(-1) |>
+  select(
+    rank = X1, 
+    team = X2) |>
+  mutate(rank = as.integer(rank),
+         year = 2026)
+
+torvik_ratings_all <- bind_rows(
+  torvik_ratings_all, torvik_raw_2021, torvik_raw_2026
+)
+
+torvik_ratings_all <- torvik_ratings_all |>
+  select(team, rank, year)
 ```
 
 Divide the dataset into transfers and non-transfers and just do some data cleaning
@@ -109,11 +156,9 @@ Add relevant variables
 
 ```{r}
 # add team ranking
-ratings_df <- ratings_df |>
+torvik_ratings_all <- torvik_ratings_all |>
   select(barthag_rk, year, team)
 
-non_transfers_df <- non_transfers_df |>
-  left_join(ratings_df, by = c("team", "year"))
 
 # add only 3 positions
 
@@ -202,4 +247,413 @@ non_transfers_df <- non_transfers_df |>
 non_transfers_2_lm <- lm(ppg ~ prev_ppg + exp + barthag_rk + pos, data = non_transfers_df)
 
 summary(non_transfers_2_lm)
+```
+
+Quick EDA
+
+```{r}
+non_transfers_df |>
+  group_by(exp) |>
+  summarise(median = median(ppg)) |>
+  ggplot(aes(x = reorder(exp, median), y = median)) +
+  geom_col() 
+```
+
+Predictors = ppg, prev_ppg, team, team_rank, pos, conference, exp
+
+Level 1 variables = ppg, prev_ppg, team_rank, exp, position
+
+Level 2 variables = team, conference
+
+See if any players change position
+
+```{r}
+#non_transfers_df |>
+#  mutate(prev_pos = lag(pos)) |>
+#  relocate(prev_pos, pos)|>
+#  filter(prev_pos != pos) |>
+#  select()
+```
+
+Attempt at mixed effects model
+
+```{r}
+install.packages("Matrix")
+#install.packages("lme4", type = "source")
+library(Matrix)
+library(lme4)
+library(nlme)
+mod_data <- non_transfers |>
+  select(ppg, prev_ppg, barthag_rk, pos, conf, exp, id) |>
+  filter(is.na(prev_ppg) != TRUE & is.na(barthag_rk) != TRUE) 
+  
+mod <- lme(ppg ~ prev_ppg + barthag_rk + pos + conf + exp, random = ~1 | id, data = mod_data)
+
+summary(mod)
+
+VarCorr(mod) 
+```
+
+new data
+
+```{r}
+data_2021 <- read_csv("../proprietary_data/mbb_202021.csv")
+data_2122 <- read_csv("../proprietary_data/mbb_202122.csv")
+data_2223 <- read_csv("../proprietary_data/mbb_202223.csv")
+data_2324 <- read_csv("../proprietary_data/mbb_202324.csv")
+data_2425 <- read_csv("../proprietary_data/mbb_202425.csv")
+data_2526 <- read_csv("../proprietary_data/mbb_202526.csv")
+
+data <- bind_rows(data_2021, data_2122, data_2223, data_2324, data_2425, data_2526)
+```
+
+ratings table for 2021-2026
+
+```{r}
+
+#df_team_ratings_2022 <- torvik_ratings(year = 2022)
+#df_team_ratings_2023 <- torvik_ratings(year = 2023)
+#df_team_ratings_2024 <- torvik_ratings(year = 2024)
+#df_team_ratings_2025 <- torvik_ratings(year = 2025)
+#df_team_ratings_2026 <- torvik_ratings(year = 2026)
+
+#ratings_df <- bind_rows(df_team_ratings_2022, df_team_ratings_2023, 
+#                        df_team_ratings_2024, df_team_ratings_2025)
+
+torvik_ratings_all <- bind_rows(
+  torvik_ratings(year = 2021) |> mutate(season = 2021),
+  torvik_ratings(year = 2022) |> mutate(season = 2022),
+  torvik_ratings(year = 2023) |> mutate(season = 2023),
+  torvik_ratings(year = 2024) |> mutate(season = 2024),
+  torvik_ratings(year = 2025) |> mutate(season = 2025)
+)
+
+url_2021 <- "http://barttorvik.com/2021_team_results.csv"
+url_2026 <- "http://barttorvik.com/2026_team_results.csv"
+torvik_2021 <- read_csv(url_2021, col_names = FALSE)
+torvik_2026 <- read_csv(url_2026, col_names = FALSE)
+
+
+torvik_raw_2021 <- torvik_2021 |> 
+  slice(-1) |>
+  select(
+    rank = X1, 
+    team = X2) |>
+  mutate(rank = as.integer(rank),
+         year = 2021)
+
+torvik_raw_2026 <- torvik_2026 |> 
+  slice(-1) |>
+  select(
+    rank = X1, 
+    team = X2) |>
+  mutate(rank = as.integer(rank),
+         year = 2026)
+
+torvik_ratings_all <- bind_rows(
+  torvik_ratings_all, torvik_raw_2021, torvik_raw_2026
+)
+
+torvik_ratings_all <- torvik_ratings_all |>
+  select(team, rank, year)
+```
+
+```{r}
+
+```
+
+split data into transfer vs non-transfer & some data cleaning
+
+```{r}
+# make year column neat using genius_season_name
+# year column is the year that seasons championship was played
+data <- data |>
+  mutate(year = str_sub(GENIUS_SEASON_NAME, start = 1, end = 7)) |>
+  relocate(year) |>
+  mutate(year = paste0(str_sub(year, 1, 2), str_sub(year, 6, 7))) |>
+  mutate(year = as.numeric(year))
+
+data <- data |>
+  rename(team = GENIUS_TEAM_NAME)
+
+
+# id = GENIUS_PERSON_ID
+# year = year
+# team = team
+# prev_team = prev_team
+# prev_year = prev_year
+# prev_ppg = prev_ppg
+# 
+
+data <- data |>
+  arrange(GENIUS_PERSON_ID, year) |>
+  group_by(GENIUS_PERSON_ID) |>
+  mutate(prev_team = lag(team),
+         prev_year = lag(year),
+         #if they have a previous team AND 
+         #the year is the one right after the previous year AND 
+         #the team they're on is not the same as the previous team THEN
+         #changed_team is through IF NOT THEN
+         #changed_team is false 
+         changed_team = ifelse(!is.na(prev_team) &
+                                 year == (prev_year + 1) &
+                                 team != prev_team,
+                               TRUE,
+                               FALSE)) |>
+  ungroup() |>
+  relocate(changed_team)
+
+```
+
+join the ratings on new data
+
+```{r}
+#data <- data |>
+#  left_join(torvik_ratings_all, by = c("team", "year"))
+
+#data |> 
+#  summarize(na_count = sum(is.na(rank)))
+```
+
+address the 7778 na in the rank column
+
+```{r}
+unique(data$team)
+
+unique(torvik_ratings_all$team)
+
+data <- data  |>
+  mutate(team = case_when(
+    team == "St. John's (NY)"        ~ "St. John's",
+    team == "UConn"                  ~ "Connecticut",
+    team == "A&M-Corpus Christi"     ~ "Texas A&M Corpus Chris",
+    team == "App State"              ~ "Appalachian St.",
+    team == "Ark.-Pine Bluff"        ~ "Arkansas Pine Bluff",
+    team == "Army West Point"        ~ "Army",
+    team == "Bethune-Cookman"        ~ "Bethune Cookman",
+    team == "Boston U."              ~ "Boston University",
+    team == "California Baptist"     ~ "Cal Baptist",
+    team == "Central Ark."           ~ "Central Arkansas",
+    team == "Central Conn. St."      ~ "Central Connecticut",
+    team == "Central Mich."          ~ "Central Michigan",
+    team == "Charleston So."         ~ "Charleston Southern",
+    team == "Col. of Charleston"     ~ "Charleston",
+    team == "CSU Bakersfield"        ~ "Cal St. Bakersfield",
+    team == "CSUN"                   ~ "Cal St. Northridge",
+    team == "Eastern Ill."           ~ "Eastern Illinois",
+    team == "Eastern Ky."            ~ "Eastern Kentucky",
+    team == "Eastern Mich."          ~ "Eastern Michigan",
+    team == "ETSU"                   ~ "East Tennessee St.",
+    team == "FDU"                    ~ "Fairleigh Dickinson",
+    team == "FGCU"                   ~ "Florida Gulf Coast",
+    team == "Ga. Southern"           ~ "Georgia Southern",
+    team == "Gardner-Webb"           ~ "Gardner Webb",
+    team == "Grambling"              ~ "Grambling St.",
+    team == "Kansas City"            ~ "UMKC",
+    team == "Lamar University"       ~ "Lamar",
+    team == "LMU (CA)"               ~ "Loyola Marymount",
+    team == "Loyola Maryland"        ~ "Loyola MD",
+    team == "ULM"                    ~ "Louisiana Monroe",
+    team == "McNeese"                ~ "McNeese St.",
+    team == "Miami (FL)"             ~ "Miami FL",
+    team == "Miami (OH)"             ~ "Miami OH",
+    team == "Middle Tenn."           ~ "Middle Tennessee",
+    team == "Mississippi Val."       ~ "Mississippi Valley St.",
+    team == "N.C. A&T"               ~ "North Carolina A&T",
+    team == "N.C. Central"           ~ "North Carolina Central",
+    team == "NC State"               ~ "N.C. State",
+    team == "Nicholls"               ~ "Nicholls St.",
+    team == "NIU"                    ~ "Northern Illinois",
+    team == "Omaha"                  ~ "Nebraska Omaha",
+    team == "Ole Miss"               ~ "Mississippi",
+    team == "Prairie View"           ~ "Prairie View A&M",
+    team == "Queens (NC)"            ~ "Queens",
+    team == "Saint Mary's (CA)"      ~ "Saint Mary's",
+    team == "Sam Houston"            ~ "Sam Houston St.",
+    team == "Seattle U"              ~ "Seattle",
+    team == "SFA"                    ~ "Stephen F. Austin",
+    team == "SIUE"                   ~ "SIU Edwardsville",
+    team == "Southeast Mo. St."      ~ "Southeast Missouri St.",
+    team == "Southeastern La."       ~ "Southeastern Louisiana",
+    team == "Southern Ind."          ~ "Southern Indiana",
+    team == "Southern Miss."         ~ "Southern Miss",
+    team == "Southern U."            ~ "Southern",
+    team == "St. Francis Brooklyn"   ~ "St. Francis NY",
+    team == "St. Thomas (MN)"        ~ "St. Thomas",
+    team == "UT Martin"              ~ "Tennessee Martin",
+    team == "UIC"                    ~ "Illinois Chicago",
+    team == "UMES"                   ~ "Maryland Eastern Shore",
+    team == "UNI"                    ~ "Northern Iowa",
+    team == "UNCW"                   ~ "UNC Wilmington",
+    team == "Southern California"    ~ "USC",
+    team == "UTRGV"                  ~ "UT Rio Grande Valley",
+    team == "Western Caro."          ~ "Western Carolina",
+    team == "Western Ill."           ~ "Western Illinois",
+    team == "Western Ky."            ~ "Western Kentucky",
+    team == "Western Mich."          ~ "Western Michigan",
+    team == "UAlbany"                ~ "Albany",
+    team == "Alcorn"                 ~ "Alcorn St.",
+    team == "UIW"         ~ "Incarnate Word",
+    team == "Eastern Wash."  ~ "Eastern Washington",
+    team == "Northern Colo." ~ "Northern Colorado",
+    team == "Fla. Atlantic"  ~ "Florida Atlantic",
+    team == "Northern Ariz." ~ "Northern Arizona",
+    team == "Northern Ky."   ~ "Northern Kentucky",
+    team == "South Fla."     ~ "South Florida",
+    team == "North Ala."     ~ "North Alabama",
+    team == "Southern Ill."  ~ "Southern Illinois",
+    TRUE                             ~ team
+  ))
+
+
+data <- data |>
+  left_join(torvik_ratings_all, by = c("team", "year"))
+
+data |> 
+  summarize(na_count = sum(is.na(rank)))
+
+data <- data |>
+  relocate(rank)
+
+data |>
+  filter(is.na(rank) == TRUE) |>
+  select(team, year) |>
+  group_by(team) |>
+  summarise(freq = n()) |>
+  arrange(desc(freq))
+
+data <- data |>
+  select(-c(rank.x, rank.x.x, rank.x.x.x, rank.x.x.x.x, rank.x.x.x.x.x, rank.y, rank.y.y, rank.y.y.y, rank.y.y.y.y.y, rank.y.y.y.y))
+```
+
+ok now the na count is 418 which is pretty good
+
+Predictors = ppg, prev_ppg, team, team_rank, pos, conference, exp
+
+```{r}
+data <- data |>
+  mutate(prev_ppg = lag(POINTS_PG))
+
+data |>
+  select(POINTS_PG, prev_ppg, team, rank, pos, GENIUS_CONFERENCE_NAME, YEARS_PLAYED)
+```
+
+Add has transferred column
+
+```{r}
+transfer_data <- data |>
+  group_by(GENIUS_PERSON_ID) |>
+  filter(n_distinct(team) > 1) |>
+  ungroup()
+
+data <- data |>
+  mutate(has_transferred = GENIUS_PERSON_ID %in% transfer_data$GENIUS_PERSON_ID)
+
+```
+
+Add cumulative career transfers
+
+```{r}
+career_transfers_by_player <- transfer_data |>
+  select(GENIUS_PERSON_ID, year, team) |>
+  arrange(GENIUS_PERSON_ID, year) |>
+  group_by(GENIUS_PERSON_ID) |>
+  mutate(prev_team = lag(team),
+         transfer_made = ifelse(!(is.na(prev_team)) & (team != prev_team),
+                                1, 0),
+         cumulative_career_transfers = cumsum(transfer_made),
+         num_transfers = max(cumulative_career_transfers)) |>
+  select(GENIUS_PERSON_ID, year, cumulative_career_transfers, num_transfers)
+
+career_transfers_by_player <- career_transfers_by_player |>
+  select(cumulative_career_transfers, year, GENIUS_PERSON_ID)
+
+data <- data |>
+  left_join(career_transfers_by_player, by = c("GENIUS_PERSON_ID", "year"))
+```
+
+simple EDA using new data
+
+#1 An's transfer status and trendline
+
+```{r}
+data |>
+  select(YEARS_PLAYED, has_transferred, POINTS_PG) |>
+  group_by(YEARS_PLAYED, has_transferred) |>
+  summarize(mean_ppg = mean(POINTS_PG, na.rm = TRUE)) |>
+  mutate(YEARS_PLAYED = factor(YEARS_PLAYED)) |>
+  ggplot(aes(x = YEARS_PLAYED, y = mean_ppg, color = as.factor(has_transferred))) +
+  geom_point() + geom_line(aes(group = has_transferred))
+
+data |>
+  select(YEARS_PLAYED, changed_team, POINTS_PG) |>
+  group_by(YEARS_PLAYED, changed_team) |>
+  summarize(mean_ppg = mean(POINTS_PG, na.rm = TRUE)) |>
+  mutate(YEARS_PLAYED = factor(YEARS_PLAYED)) |>
+  ggplot(aes(x = YEARS_PLAYED, y = mean_ppg, color = as.factor(changed_team))) +
+  geom_point() + geom_line(aes(group = changed_team))
+
+
+data |>
+  select(YEARS_PLAYED, has_transferred, changed_team, cumulative_career_transfers, POINTS_PG) |>
+  mutate(first_transfer_made = ifelse(cumulative_career_transfers > 0, 1, 0)) |>
+  select(-cumulative_career_transfers) |>
+  
+  group_by(YEARS_PLAYED, has_transferred, changed_team, first_transfer_made) |>
+  summarize(mean_ppg = mean(POINTS_PG, na.rm = TRUE)) |>
+  
+  ungroup() |>
+  mutate(transfer_type = case_when(
+    has_transferred == 0 & changed_team == 0 ~ "Never transferred",
+    has_transferred == 1 & changed_team == 1 ~ "Year immediately after transfer",
+    has_transferred == 1 & changed_team == 0 & first_transfer_made == 0 ~ "Has not transferred yet",
+    has_transferred == 1 & changed_team == 0 & first_transfer_made == 1 ~ "2+ years after last transfer"
+    ),
+    YEARS_PLAYED = factor(YEARS_PLAYED)) |>
+  
+  ggplot(aes(x = YEARS_PLAYED, y = mean_ppg, color = transfer_type)) +
+  geom_point() + geom_line(aes(group = transfer_type)) +
+  theme(legend.position = "bottom")
+```
+
+EDA #2
+
+PPG and MPG side by side
+
+```{r}
+data |>
+  filter(changed_team == TRUE) |>
+  filter(POINTS_PG > 2 & prev_ppg > 2) |>
+  ggplot(aes(x = prev_ppg, y = POINTS_PG)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5) + 
+  labs(x = "before transfer",
+       y = "after transfer",
+       title = "Points per game") +
+  theme(axis.title = element_text(size = 10),
+        plot.title = element_text(size = 17)) 
+
+data <- data |>
+  mutate(prev_mpg = lag(MINUTES_PG))
+
+data |>
+  filter(changed_team == TRUE) |>
+  filter(MINUTES_PG > 2 & prev_mpg > 2) |>
+  ggplot(aes(x = prev_mpg, y = MINUTES_PG)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5) +
+  labs(x = "before transfer",
+       y = "after transfer",
+       title = "Minutes per game") +
+  theme(axis.title = element_text(size = 10),
+        plot.title = element_text(size = 17))
+
+```
+
+EDA #3 Big fish little pond
+
+```{r}
+
 ```
