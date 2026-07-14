@@ -16,3 +16,16 @@ execute:
   message: false
 ---
 
+---
+## Introduction 
+
+College Athletics in America is a multi-billion-dollar enterprise and is a crucial step in developing elite athletes. Mainly governed by the National Collegiate Athletics Association (NCAA), college sports not only generates revenue, but acts as a pathway for future Olympians, professional, and world-class athletes. Because of the NCAAs global impact on athletics, looking at the rules and trends in this part of sports can provide information on what helps athletes become the most successful in their sport. An enormous part of the NCAA is for a player's ability to transfer, or when the player decides to change what institution they attend and play for. This concept is not seen in many professional levels, and allows for the player to find the best fit academically, athletically, or personally. But just like transferring impacts players individually, it also affects teams and coaches. Furthermore, a team utilizing the transfer portal, an online database where athletes declare their intent to leave, may gain a leg-up for that following season by filling performance holes in their previous roster with new talent. The effects of transferring could be endless, and a major question is what are the effects of transferring on a players performance? 
+
+## Data
+
+
+
+
+
+
+

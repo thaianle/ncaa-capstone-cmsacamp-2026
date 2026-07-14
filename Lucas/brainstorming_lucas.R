@@ -727,7 +727,8 @@ data_table <- df |>
 
 gtsave("data_table_correct.png", data = data_table)
 
-
+df |>
+  filter(pos == "PF/C")
 
 
 

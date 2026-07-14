@@ -355,7 +355,7 @@ torvik_ratings_all <- bind_rows(
 )
 
 torvik_ratings_all <- torvik_ratings_all |>
-  select(team, rank, year)
+  select(team, rank, year, barthag)
 ```
 
 ```{r}
@@ -522,8 +522,8 @@ data |>
   summarise(freq = n()) |>
   arrange(desc(freq))
 
-data <- data |>
-  select(-c(rank.x, rank.x.x, rank.x.x.x, rank.x.x.x.x, rank.x.x.x.x.x, rank.y, rank.y.y, rank.y.y.y, rank.y.y.y.y.y, rank.y.y.y.y))
+#data <- data |>
+#  select(-c(rank.x, rank.x.x, rank.x.x.x, rank.x.x.x.x, rank.x.x.x.x.x, rank.y, rank.y.y, # rank.y.y.y, rank.y.y.y.y.y, rank.y.y.y.y))
 ```
 
 ok now the na count is 418 which is pretty good
@@ -596,6 +596,7 @@ data |>
 
 data |>
   select(YEARS_PLAYED, has_transferred, changed_team, cumulative_career_transfers, POINTS_PG) |>
+  filter(YEARS_PLAYED < 7) |>
   mutate(first_transfer_made = ifelse(cumulative_career_transfers > 0, 1, 0)) |>
   select(-cumulative_career_transfers) |>
   
@@ -614,6 +615,8 @@ data |>
   ggplot(aes(x = YEARS_PLAYED, y = mean_ppg, color = transfer_type)) +
   geom_point() + geom_line(aes(group = transfer_type)) +
   theme(legend.position = "bottom")
+
+
 ```
 
 EDA #2
@@ -655,5 +658,141 @@ data |>
 EDA #3 Big fish little pond
 
 ```{r}
+# median points per game before and after a player transfers from a small to big school
+data |>
+  filter(changed_team == TRUE) |>
+  mutate(prev_major = lag(POWER_5_FLAG)) |>
+  relocate(prev_major, POWER_5_FLAG) |>
+  mutate(prev_major = as.numeric(prev_major),
+         POWER_5_FLAG = as.numeric(POWER_5_FLAG)) |>
+  filter(prev_major == 0 & POWER_5_FLAG == 1) |>
+  summarize(median_prev_ppg = median(prev_ppg, na.rm = TRUE),
+    median_ppg  = median(POINTS_PG, na.rm = TRUE)) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "Season",
+    values_to = "Median_PPG"
+  ) |>
+  ggplot(aes(x = Season, y = Median_PPG)) +
+  geom_col(width = 0.4) +
+  labs(
+    title = "median points per game before and after a player transfers from a small to big school"
+  )
 
+#median points per game before and after a player transfers from a big to small school
+data |>
+  filter(changed_team == TRUE) |>
+  mutate(prev_major = lag(POWER_5_FLAG)) |>
+  relocate(prev_major, POWER_5_FLAG) |>
+  mutate(prev_major = as.numeric(prev_major),
+         POWER_5_FLAG = as.numeric(POWER_5_FLAG)) |>
+  filter(prev_major == 1 & POWER_5_FLAG == 0) |>
+  summarize(median_prev_ppg = median(prev_ppg, na.rm = TRUE),
+    median_ppg  = median(POINTS_PG, na.rm = TRUE)) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "Season",
+    values_to = "Median_PPG"
+  ) |>
+  ggplot(aes(x = Season, y = Median_PPG)) +
+  geom_col(width = 0.4) +
+  labs(
+    title = "median points per game before and after a player transfers from a big to small school"
+  )
+
+#median points per game before and after a player transfers from a big to another big school
+
+data |>
+  filter(changed_team == TRUE) |>
+  mutate(prev_major = lag(POWER_5_FLAG)) |>
+  relocate(prev_major, POWER_5_FLAG) |>
+  mutate(prev_major = as.numeric(prev_major),
+         POWER_5_FLAG = as.numeric(POWER_5_FLAG)) |>
+  filter(prev_major == 1 & POWER_5_FLAG == 1) |>
+  summarize(median_prev_ppg = median(prev_ppg, na.rm = TRUE),
+    median_ppg  = median(POINTS_PG, na.rm = TRUE)) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "Season",
+    values_to = "Median_PPG"
+  ) |>
+  ggplot(aes(x = Season, y = Median_PPG)) +
+  geom_col(width = 0.4) +
+  labs(
+    title = "median points per game before and after a player transfers from a big to another school"
+  )
+
+#median points per game before and after a player transfers from a small to another small school
+data |>
+  filter(changed_team == TRUE) |>
+  mutate(prev_major = lag(POWER_5_FLAG)) |>
+  relocate(prev_major, POWER_5_FLAG) |>
+  mutate(prev_major = as.numeric(prev_major),
+         POWER_5_FLAG = as.numeric(POWER_5_FLAG)) |>
+  filter(prev_major == 0 & POWER_5_FLAG == 0) |>
+  summarize(median_prev_ppg = median(prev_ppg, na.rm = TRUE),
+    median_ppg  = median(POINTS_PG, na.rm = TRUE)) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "Season",
+    values_to = "Median_PPG"
+  ) |>
+  ggplot(aes(x = Season, y = Median_PPG)) +
+  geom_col(width = 0.4) +
+  labs(
+    title = "median points per game before and after a player transfers from a small to another small school"
+  )
+```
+
+EDA #4 transferring and looking at team rating
+
+```{r}
+# find average change in team ranking when it comes to transferring
+data <- data |>
+  relocate(barthag)
+
+barthag_data <- data |>
+  filter((is.na(rank) == FALSE) & (changed_team == TRUE)) |>
+  mutate(prev_barthag = lag(barthag)) |>
+  mutate(change_in_barthag = prev_barthag - barthag)
+  
+
+ggplot(barthag_data, aes(x = change_in_barthag)) +
+  geom_histogram(aes(y = after_stat(density)), 
+                 fill = "lightblue", 
+                 color = "black", 
+                 alpha = 0.7) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(barthag_data$change_in_barthag, na.rm = TRUE),
+                            sd   = sd(barthag_data$change_in_barthag, na.rm = TRUE)),
+                color = "darkred",
+                linewidth = 1.5) +
+  theme_minimal()
+
+```
+
+find overperformer and underperformer
+
+```{r}
+data <- data |>
+  filter(is.na(POINTS_PG) != TRUE) |>
+  group_by(team, year) |>
+  mutate(team_avg_ppg = mean(POINTS_PG)) |>
+  ungroup() |>
+  relocate(team_avg_ppg) |>
+  mutate(is_overperformer = ifelse(POINTS_PG >= team_avg_ppg, TRUE, FALSE)) |>
+  relocate(is_overperformer)
+```
+
+EDA #5 using is_overperformer
+
+```{r}
+data |>
+  ggplot(aes(x = factor(changed_team), fill = factor(is_overperformer))) +
+  geom_bar(position = "fill") +
+  labs(
+    x = "changed team",
+    y = "proportion",
+    fill = "is overperformer"
+  )
 ```
