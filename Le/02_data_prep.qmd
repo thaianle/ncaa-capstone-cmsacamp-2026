@@ -52,6 +52,12 @@ df_enhanced <- df |>
     exp = case_when(
       exp == "Fr" ~ "1", exp == "So" ~ "2", exp == "Jr" ~ "3",
       exp == "Sr" ~ "4", TRUE ~ exp
+      ),
+    # Recode the position names for easier analysis
+    pos = case_when(
+      pos %in% c("Wing F", "Stretch 4", "PF/C") ~ "forward",
+      pos == "C" ~ "center",
+      pos %in% c("Combo G", "Scoring PG", "Wing G", "Pure PG") ~ "guard"
       )
     ) |>
   # Convert experience level to numeric
@@ -258,11 +264,54 @@ df_team_ratings <- df_team_ratings_full |>
 df_team_ratings
 ```
 
+I realized that I need to also account for the fact that not every player is transferring and some new players join the NCAA Division I in each year (like freshmen graduating from high school), so I will fill in certain `NA`s in the dataset for players who have not yet transferred.
+
+```{r}
+df_enhanced <- df_enhanced |>
+  
+  # Add information for players who have not yet transferred and who have just joined the team
+  mutate(prev_team = ifelse(year != 2022 & changed_team == 0, team, prev_team)) |>
+  mutate(changed_team = ifelse(year != 2022 & is.na(prev_team), 0, changed_team)) |>
+  
+  # Some teams have not joined Division I until recently
+  # Therefore, we also need to replace the prev_team and changed_team as NA because we have
+  # no other information
+  mutate(
+    prev_team = case_when(
+      team == "East Texas A&M" & year <= 2023	~ NA,
+      team == "Le Moyne" & year <= 2024	~ NA,
+      team == "Lindenwood" & year <= 2023	~ NA,
+      team == "Mercyhurst" & year <= 2025 ~ NA,
+      team == "New Haven" & year <= 2026 ~ NA,
+      team == "Queens" & year <= 2023 ~ NA,
+      team == "Southern Indiana" & year <= 2023 ~ NA,
+      team == "Stonehill" & year <= 2023 ~ NA,
+      team == "West Georgia" & year <= 2025 ~ NA,
+      TRUE ~ prev_team
+      ),
+    changed_team = case_when(
+      team == "East Texas A&M" & year <= 2023	~ NA,
+      team == "Le Moyne" & year <= 2024	~ NA,
+      team == "Lindenwood" & year <= 2023	~ NA,
+      team == "Mercyhurst" & year <= 2025 ~ NA,
+      team == "New Haven" & year <= 2026 ~ NA,
+      team == "Queens" & year <= 2023 ~ NA,
+      team == "Southern Indiana" & year <= 2023 ~ NA,
+      team == "Stonehill" & year <= 2023 ~ NA,
+      team == "West Georgia" & year <= 2025 ~ NA,
+      TRUE ~ changed_team
+      )
+  )
+```
+
 I will create some more variables in the working dataframe, `df_enhanced`. This applies to all players including those who did not transfer. They should be blank for the 2022 season because we were not so sure about the player's previous team:
 
-- `prev_year`: The previous season for the player, which can be represented as a formula: `prev_year = year - 1`. \[adjust later: add for redshirting or temporarily away from NCAA DI\]
-- `prev_barthag_current`: The Barthag rating of the current team in the previous season (the "destination team" for player transfers).
+- `prev_year`: The previous season for the player, which can be represented as a formula: `prev_year = year - 1`.
 - `current_barthag`: The Barthag rating of the current team in the current season.
+- `prev_barthag_current`: The Barthag rating of the current team in the previous season (the "destination team" for players who transferred).
+- `prev_barthag_prev`: The Barthag rating of the previous team in the previous season (the "departure team" for players who transferred).
+
+I also want to take the differences in the ratings as whether the player transfers from a lower-ranked school to a higher-ranked school and vice versa, and add whether. Thus, I will create a new variable called `team_rating_change`, which takes the difference in team's Barthag rating from previous year to current year.
 
 ```{r}
 df_enhanced <- df_enhanced |>
@@ -272,7 +321,36 @@ df_enhanced <- df_enhanced |>
   rename(current_barthag = barthag) |>
   # Add the team rating of the current team in the previous season
   left_join(df_team_ratings, join_by(prev_year == year, team)) |>
-  rename(prev_barthag_current = barthag)
+  rename(prev_barthag_current = barthag) |>
+  # Add the team rating of the previous team in the previous season
+  left_join(df_team_ratings, join_by(prev_year == year, prev_team == team)) |>
+  rename(prev_barthag_prev = barthag) |>
+  
+  # Create the team rating change of the player from this year to last year,
+  # and create indicators that signal moving from small to big teams and vice versa
+  
+  # The threshold of 0.1 for better/worse team is actually suggested by AI (eg: 0.6 vs 0.5)
+  # I need someone with more domain knowledge here
+  mutate(team_rating_change = current_barthag - prev_barthag_prev,
+         to_better_team = ifelse(
+           changed_team == 1 & (!is.na(team_rating_change)) & team_rating_change >= 0.1,
+           1, 0
+         ),
+         to_worse_team = ifelse(
+           changed_team == 1 & (!is.na(team_rating_change)) & team_rating_change <= -0.1,
+           1, 0
+         ),
+         to_same_tier_team = ifelse(
+           changed_team == 1 & (!is.na(team_rating_change)) &
+             team_rating_change > -0.1 & team_rating_change < 0.1,
+           1, 0
+         )) |>
+  
+  # Note that if changed_team is currently NA (not sufficient information),
+  # each transfer indicators should also return NA
+  mutate(to_better_team = ifelse(is.na(changed_team), NA, to_better_team),
+         to_worse_team = ifelse(is.na(changed_team), NA, to_worse_team),
+         to_same_tier_team = ifelse(is.na(changed_team), NA, to_same_tier_team))
 
 df_enhanced
 ```
@@ -290,17 +368,69 @@ df_enhanced |>
 
 All observations in this output does not have previous Barthag score, because they did not compete in NCAA Division I men's basketball in the previous year (they were in Division II). Therefore, we can temporarily safely declare that the merge on standardized team names is valid.
 
-For better modeling, we can also fill in these `NA` values with a zero Barthag score. According to [this blog post](https://adamcwisports.blogspot.com/p/every-possession-counts.html), the Barthag score represents a team's chance of winning against an *average* DI team, and it seems that (and AI said that) there is no team with a Barthag rating of exactly zero. The gap of athletic ability between Division I and lower-division teams is usually large, so we can safely impute zero for all the `NA` values that we have seen in the previous output.
+Next, I will determine whether a player is transferring to a higher-tier, lower-tier, or same-tier conference using the same programming approach that I did above.
+
+The reason why I chose this over pure numerical ratings is that the high-major to low-major classification is also heavily tied to television rights and thus in turn affects the player's NIL, which is a crucial factor in a transferring decision that we have almost no data to control. In addition, this choice also attempts to replicate the insights from the original paper on "big fish, little pond".
 
 ```{r}
-# https://tidyr.tidyverse.org/reference/replace_na.html
 df_enhanced <- df_enhanced |>
-  mutate(prev_barthag_current = case_when(
-    year == 2022 ~ NA, # We do not have 2021 Barthag ratings for the teams yet
-    year >= 2023 ~ replace_na(prev_barthag_current, 0)
-  ))
+  # Add information for players who have not yet transferred and who have just joined the team
+  mutate(
+    prev_conf_class = ifelse(year != 2022 & changed_team == 0, conf_class, prev_conf_class)
+    ) |>
+  mutate(
+    prev_conf_class = case_when(
+      team == "East Texas A&M" & year <= 2023	~ NA,
+      team == "Le Moyne" & year <= 2024 ~ NA,
+      team == "Lindenwood" & year <= 2023 ~ NA,
+      team == "Mercyhurst" & year <= 2025 ~ NA,
+      team == "New Haven" & year <= 2026 ~ NA,
+      team == "Queens" & year <= 2023 ~ NA,
+      team == "Southern Indiana" & year <= 2023 ~ NA,
+      team == "Stonehill" & year <= 2023 ~ NA,
+      team == "West Georgia" & year <= 2025 ~ NA,
+      TRUE ~ prev_conf_class
+      )
+  )
+```
 
-df_enhanced
+```{r}
+df_enhanced <- df_enhanced |>
+  
+  # This is just an intermediate step. I will also have another mutate to make the syntax cleaner
+  mutate(to_better_conf = ifelse(changed_team == 0, 0, NA),
+         to_worse_conf = ifelse(changed_team == 0, 0, NA),
+         to_same_tier_conf = ifelse(changed_team == 0, 0, NA)) |>
+  
+  # Now do the actual filtering with the values that I have set to NA
+  mutate(
+    
+    to_better_conf = case_when(
+      (!is.na(conf_class)) & (!is.na(prev_conf_class)) & is.na(to_better_conf) &
+        conf_class %in% c("high-major", "mid-major") & prev_conf_class == "low-major" ~ 1,
+      (!is.na(conf_class)) & (!is.na(prev_conf_class)) & is.na(to_better_conf) &
+        conf_class == "high-major" & prev_conf_class %in% c("mid-major", "low-major") ~ 1,
+      year == 2022 ~ NA, # we don't have information
+      TRUE ~ 0
+      ),
+    
+    to_worse_conf = case_when(
+      (!is.na(conf_class)) & (!is.na(prev_conf_class)) & is.na(to_worse_conf) &
+        conf_class %in% c("low-major", "mid-major") & prev_conf_class == "high-major" ~ 1,
+      (!is.na(conf_class)) & (!is.na(prev_conf_class)) & is.na(to_worse_conf) &
+        conf_class == "low-major" & prev_conf_class %in% c("mid-major", "high-major") ~ 1,
+      year == 2022 ~ NA,
+      TRUE ~ 0
+      ),
+    
+    to_same_tier_conf = case_when(
+      (!is.na(conf_class)) & (!is.na(prev_conf_class)) & is.na(to_same_tier_conf) &
+        conf_class == prev_conf_class ~ 1,
+      year == 2022 ~ NA,
+      TRUE ~ 0
+      )
+    
+  )
 ```
 
 I will also add the conference's average Barthag rating in the current year (`current_barthag_conf`) and the same conference's average Barthag rating in the previous year (`prev_barthag_current_conf`) as an indicator of the conference's overall competitiveness.
@@ -341,9 +471,116 @@ df_enhanced |>
   facet_wrap(~ year)
 ```
 
+#### 5. Whether the player is an overperformer or underperformer
+
+The code is somewhat inspired by Kendall's implementation. Using the "big fish, little pond" paper, if a player performs greater than or equal to the team median in the previous year, they will be coded as an overperformer (`is_prev_overperformer = 1`) and vice versa. I use the median because player performance across a team or across the entire league is usually very heavily skewed.
+
+In a similar way, I will create another indicator variable, `is_prev_underperformer`, to spot players who perform lower than the team average in the previous year. Note that `is_prev_overperformer` and `is_prev_underperformer` is not perfectly correlated, because for new players, `is_prev_overperformer = is_prev_underperformer = 0`.
+
+```{r}
+# But first, we need to fill in the previous points per game for players who do not transfer
+
+# Note that because of my data wrangling, new players have a NA for prev_d1_year but still
+# have prev_team (? I might address that later, but this might take a long time)
+
+prev_team_fill <- df_enhanced |>
+  select(id, year, changed_team, team, ppg, prev_d1_year, prev_team, prev_ppg) |>
+  filter(!is.na(prev_d1_year)) |>
+  # The "coalesce" command replace any NA of prev_team with the corresponding value in team
+  mutate(prev_team = coalesce(prev_team, team))
+
+prev_team_fill
+
+# Select and rename necessary columns for a merge-friendly version with the original dataset
+prev_team_fill_merge <- prev_team_fill |>
+  select(id, year, prev_team_adjusted = prev_team)
+
+prev_team_fill_merge
+```
+
+```{r}
+# Get the overall PPG for (ID, year) player as a single dataset to better track data
+player_ppg_only <- df_enhanced |>
+  select(id, year, ppg)
+
+player_ppg_only
+
+# Get the (ID, year) observations where prev_ppg is still NA
+na_prev_ppg <- prev_team_fill |>
+  filter(is.na(prev_ppg)) |>
+  select(id, prev_d1_year)
+
+na_prev_ppg
+
+# Then, join both datasets together to fill these NA values
+prev_ppg_fill <- na_prev_ppg |>
+  left_join(player_ppg_only, join_by(id, prev_d1_year == year)) |>
+  rename(prev_ppg = ppg)
+
+prev_ppg_fill
+
+full_prev_ppg_fill <- prev_team_fill |>
+  select(id, prev_d1_year, prev_ppg) |>
+  rows_patch(prev_ppg_fill, by = c("id", "prev_d1_year")) |>
+  # Rename columns to better merge with the original dataset
+  rename(prev_ppg_adjusted = prev_ppg)
+
+full_prev_ppg_fill
+```
+
+```{r}
+# Finally, we can work on the merging into the original dataset
+df_enhanced <- df_enhanced |>
+  left_join(prev_team_fill_merge, join_by(id, year)) |>
+  left_join(full_prev_ppg_fill, join_by(id, prev_d1_year)) |>
+  # I can also use "coalesce" again to fill in the NA positions
+  mutate(prev_team = coalesce(prev_team, prev_team_adjusted),
+         prev_ppg = coalesce(prev_ppg, prev_ppg_adjusted)) |>
+  # Finally, I will drop the intermediary variables created for the fill-in purposes
+  select(-prev_team_adjusted, -prev_ppg_adjusted)
+
+df_enhanced
+```
+
+```{r}
+# Dataset of the median points per game for each team in each year
+median_ppg_team <- df_enhanced |>
+  select(year, team, ppg) |>
+  group_by(year, team) |>
+  summarize(prev_median_ppg_team = median(ppg)) |>
+  ungroup()
+
+median_ppg_team
+```
+
+```{r}
+# Join the median points per game of team in the previous year in D1
+# We use a comparison to see if the player was previously an overperformer or not
+
+df_enhanced <- df_enhanced |>
+  left_join(median_ppg_team, join_by(prev_d1_year == year, prev_team == team)) |>
+  
+  # We also want to remove the previous team for players who have not yet joined
+  # Division I before
+  
+  mutate(prev_team = ifelse(year != 2022 & is.na(prev_d1_year), NA, prev_team),
+         is_prev_overperformer = ifelse(
+           prev_ppg >= prev_median_ppg_team & (!is.na(prev_ppg)) &
+             (!is.na(prev_median_ppg_team)), 1, 0
+           ),
+         is_prev_underperformer = ifelse(
+           prev_ppg < prev_median_ppg_team & (!is.na(prev_ppg)) &
+             (!is.na(prev_median_ppg_team)), 1, 0)
+         )
+```
+
+```{r}
+df_enhanced
+```
+
 #### Final step
 
-Finally, I will export the dataframe to a CSV file for later use (This should not be pushed into a public GitHub repo):
+Finally, I will export the dataframe to a CSV file for later use (This should not be pushed directly into a public GitHub repo):
 
 ```{r}
 write.csv(df_enhanced, "player_stats_hoopR.csv", row.names = FALSE)
