@@ -1,5 +1,6 @@
 ---
-title: "ncaa-capstone-report"
+title: "Effects of Transferring on Player Performance"
+subtitle: "An Analysis on Division I Men's Basketball"
 author:
   - An Le
   - Kendall Lucas
@@ -20,24 +21,50 @@ execute:
 
 ## Introduction
 
-College Athletics in America is a multi-billion-dollar enterprise and is a crucial step in developing elite athletes. Mainly governed by the National Collegiate Athletics Association (NCAA), college sports not only generates revenue, but acts as a pathway for future Olympians, professional, and world-class athletes. Because of the NCAAs global impact on athletics, looking at the rules and trends in this part of sports can provide information on what helps athletes become the most successful in their sport. An enormous part of the NCAA is for a player's ability to transfer, or when the player decides to change what institution they attend and play for. This concept is not seen in many professional levels, and allows for the player to find the best fit academically, athletically, or personally. But just like transferring impacts players individually, it also affects teams and coaches. Furthermore, a team utilizing the transfer portal, an online database where athletes declare their intent to leave, may gain a leg-up for that following season by filling performance holes in their previous roster with new talent. The effects of transferring could be endless, and a major question is what are the effects of transferring on a players performance?
+College Athletics in America is a multi-billion-dollar enterprise and is a crucial step in developing elite athletes. Mainly governed by the National Collegiate Athletics Association (NCAA), college sports not only generates revenue, but acts as a pathway for future Olympians, professional, and world-class athletes. Because of the NCAAs global impact on athletics, looking at the rules and trends in this part of sports can provide information on what helps athletes become the most successful in their sport.
+
+An enormous part of the NCAA is for a player's ability to transfer, or when the player decides to change what institution they attend and play for. This concept is not seen in many professional levels, and allows for the player to find the best fit academically, athletically, or personally. Transferring rules have changed drastically within the last decade. A simple timeline goes as follows:
+
+-   2018 - **launch of NCAA Transfer Portal** *"student athlete database compliance tool"*
+
+-   2020 - COVID-19 begins to impact college sports
+
+-   2021 - Student athletes allowed to **transfer once without sitting out a year** & **NIL** era begins
+
+-   2024 - **Immediate eligibility no matter how many times athletes transferred**
+
+Due to these new rules, the number of athletes transferring increases each year. This new trend allows for new analysis of college sports. Transferring has a huge impact on coaches, players, and programs as a whole. It allows for easier and quicker access for athletes to find a better fit, coaches to find a missing piece to their roster, and athletic departments to attract new talent to boost their reputation. The effects of transferring could be endless. One of these effects effects all three entities, players, coaches, and schools. What is the effects of transferring on a players performance?
 
 ## Data
 
-When it comes to the data used in our research, we used multiple sources. All of these sources are structured similarly; each observation is a player's season and their metrics for that season. For the first data source, we used data from the cbbdata R package to do some exploratory data analysis (EDA) to find overall trends and patterns. However, upon further research, it was determined that the hoopR package had more up-to-date data on player metrics and transfer status. After exploring this data a little more, the last dataset was given by an external advisor. This data is proprietary and not available to the public. Regarding adding new features, similar columns were created dispite the use of three different data sources. This was mainly because comparing metrics between transfers and non-transfers and also comparing transfer athletes the year before and year after their transfer. So, columns indicating a if the player is a transfer for a certain year, if they have transferred before, and how many times they have transferred were added for insight on a player's career path. Along with this, features on a player's previous years metrics were used to see a difference in player's performance between years. EDA that was completed to analyze the patterns used both categories of the new features created.
+When it comes to the data used in our research, we used multiple sources. All of these sources are structured similarly; each observation is a player's season and their metrics for that season. The data sources we used were:
+
+-   `cbbdata` R package developed by Andrew Weatherman
+
+-   `hoopR` R package part of the **SportsDataverse** ecosystem
+
+-   Proprietary data provided by the University of Pittsburgh Athletics Department
+
+A simplified example of what the overall structures of these datasets look like: 
+
+| Player | Year | Team | PPG | MPG |
+|:-------|:---:|:---:|----:|----:|
+| J. Broome | 2025 | Auburn | 18.6 | 30.2 |
+| L. Garza | 2021 | Iowa | 24.1 | 31.5 |
+| Z. Edey | 2023 | Purdue | 22.3 | 31.7 |
+| Z. Edey | 2024 | Purdue | 25.2 | 32.0 |
+| C. Flagg | 2025 | Duke | 19.2 | 31.3 | 
+
+The data used only contains player demographics and metrics from seasons 2021-2026 (season is the year the championship for that season was played) as these are the years within the NIL era. 
+
+For the first data source, we used data from the cbbdata R package to do some exploratory data analysis (EDA) to find overall trends and patterns. However, upon further research, it was determined that the hoopR package had more up-to-date data on player metrics and transfer status. After exploring this data a little more, the last dataset was given by an external advisor. This data is proprietary and not available to the public. Regarding adding new features, similar columns were created dispite the use of three different data sources. This was mainly because comparing metrics between transfers and non-transfers and also comparing transfer athletes the year before and year after their transfer. So, columns indicating a if the player is a transfer for a certain year, if they have transferred before, and how many times they have transferred were added for insight on a player's career path. Along with this, features on a player's previous years metrics were used to see a difference in player's performance between years. EDA that was completed to analyze the patterns used both categories of the new features created.
 
 #### EDA 1: If a player is already performing well, they should not transfer
 
-![](side_by_side.png) \
+![](side_by_side_correct_3.png)
 
 #### EDA 2: Average points per game generally improves over players’ careers, but transfers typically outperform non-transfers
 
-put image here
+![](Le/cp1_age_curves.png)
 
 ## Methods
-
-
-
-
-
-

@@ -796,3 +796,21 @@ data |>
     fill = "is overperformer"
   )
 ```
+
+Try some of An's modelling
+
+```{r}
+
+clean_data <- data |>
+  filter((!is.na(changed_team) & (!is.na(prev_ppg))))
+
+#install.packages("MatchIt")
+library(MatchIt)
+
+match_simplest <- matchit(changed_team ~ prev_ppg,
+                          data = clean_data, method = "nearest", distance = "glm",
+                          replace = TRUE, ratio = 1)
+match_simplest_summary <- summary(match_simplest)
+
+match_simplest_summary
+```

@@ -59,6 +59,8 @@ library(plotly)
 library(gt)
 library(patchwork)
 
+theme_set(theme_bw())
+
 
 #code thanks to An!
 df_2022 <- cbd_torvik_player_season(year = 2022)
@@ -301,7 +303,8 @@ long2 |>
 df |>
   ggplot(aes(x = mpg)) +
   stat_ecdf(geom = "step") +
-  scale_x_continuous(breaks = seq(0, 100, by = 5)) 
+  scale_x_continuous(breaks = seq(0, 100, by = 1)) +
+  scale_y_continuous(breaks = seq(0, 1, by = .05))
 
 df_filtered <- df |> 
   filter(changed_team == TRUE) |> 
@@ -439,7 +442,8 @@ long_ppg |>
 df |>
   ggplot(aes(x = ppg)) +
   stat_ecdf(geom = "step") +
-  scale_x_continuous(breaks = seq(0, 25, by = 5)) 
+  scale_x_continuous(breaks = seq(0, 100, by = 1)) +
+  scale_y_continuous(breaks = seq(0, 1, by = .05))
 
 df_ppg_filtered <- df |> 
   filter(changed_team == TRUE) |> 
@@ -455,7 +459,7 @@ intersect_ppg_y   <- smooth_ppg_data$y[intersect_ppg_idx]
 
 before_after_ppg <- df |>
   filter(changed_team == TRUE) |>
-  filter(ppg > 2 & prev_ppg > 2) |>
+  filter(ppg > 1 & prev_ppg > 1) |>
   ggplot(aes(x = prev_ppg, y = ppg)) +
   geom_point(alpha = 0.6) +
   geom_smooth() +
@@ -463,16 +467,37 @@ before_after_ppg <- df |>
   labs(x = "before transfer",
        y = "after transfer",
        title = "Points per game") +
-  theme(axis.title = element_text(size = 10),
-        plot.title = element_text(size = 17)) 
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 12, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 9, vjust = -2.5),
+        axis.text = element_text(size = 11),
+        legend.text = element_text(size = 12))
   
-  
+before_after_mpg <- df |>
+  filter(changed_team == TRUE) |>
+  filter(mpg > 4 & prev_mpg > 4) |>
+  ggplot(aes(x = prev_mpg, y = mpg)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linewidth = 1.5) +
+  labs(x = "before transfer",
+       y = "after transfer",
+       title = "Minutes per game") +
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 12, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 9, vjust = -2.5),
+        axis.text = element_text(size = 11),
+        legend.text = element_text(size = 12))
 
 # put these side by side
 
 side_by_side <- before_after_mpg + before_after_ppg
 
-ggsave("side_by_side_correct.png", plot = side_by_side)
+side_by_side
+
+ggsave("side_by_side_correct_3.png", plot = side_by_side)
 
 #if a player had less that ~7-8 points per game, on average, they received more 
 #points per game after their transfer, however, if a player had more than 7-8 points per game,
