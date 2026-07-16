@@ -1,0 +1,102 @@
+---
+title: "Effects of Transferring on Player Performance"
+subtitle: "An Analysis on Division I Men's Basketball"
+author:
+  - An Le, Bates College
+  - Kendall Lucas, Duquesne University
+date: "July 24, 2026"
+toc: true
+format:
+  html:
+    theme: cosmo
+    html-math-method: katex
+    self-contained: true
+    anchor-sections: false
+execute:
+  echo: false
+  warning: false
+  message: false
+editor: source
+---
+
+------------------------------------------------------------------------
+
+## Methods
+
+### 1. Model selection
+
+As part of our experimentation with different models, we tested the model in the process of increasing complexity. We will test whether a fixed effects or random effects model is needed, then we will test if the propensity score matching is needed to address selection biases associated with players who elected to transfer versus players who did not. The list of variables and subscripts used in our equations can be referred in the below Appendix.
+
+Using a multiple linear regression model fitted using OLS, our fixed effects multiple linear regression model set-up is:
+
+$$
+PPG{ijt} = \beta_0 + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{1}
+$$
+
+In the mixed effects model, we are just substituting the fixed intercept, $\beta_0$, with a random intercept that is allowed to vary with individual athletes and teams:
+
+$$
+PPG_{ijt} = a_{ij} + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{2}
+$$
+
+where the random intercepts are determined by the equation: $a_{ij} = \alpha_0 + u_{ij}, \quad u_{ij} \sim N(0,\tau^2)$.
+
+Finally, we set up a propensity score matching model, which uses a logistic regression model:
+
+$$
+Transferred_{ijt} = \beta_0 + \beta_1 Position_{it} + \beta_2 Experience_{it} + \beta_3 TeamRating_{jt} + \beta_4 ConfRating_{kt}
+$$
+
+Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference, and $t$ is the year.
+
+### 2. Robustness checks
+
+In addition, as a robustness check, we attempted to verify the insights made in [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15) about the different effects of transferring when the player had been overperforming or underperforming in the previous year. We used a slightly different definition of over- and underperforming compared to the original paper, using the median points per game as the baseline performance rather than mean points per game. Overperforming means that the player had the points per game higher or equal to the median points per game (top 50% of the team), and underperforming means the opposite. This is because points per game in the teams are very highly skewed, with several top-tier players dominating the scores and a certain number of benched players did not have enough chances to play to create scores.
+
+## Results
+
+(1) Fixed effects or mixed effects model? If mixed effects, which effects?
+
+(2) With and without matching (optional? if so, include balance diagnostics)
+
+(3) Attempt to replicate the big fish little pond paper [(Cole et al., 2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15)
+
+## Discussion
+
+[Add some connection between results and domain knowledge]
+
+Limitations and next steps:
+
+- Weirdness in eligibility data (changes in eligibility rules, redshirting, one-and-done, transferring involving outside DI institutions, etc.)
+
+- Transfers for non-athletic-related reasons (eg: academic or proximity to home, NIL, injury, coaching changes) -\> More data collection is needed
+
+- Points per game might not be an accurate indicator of performance -\> use publicly available datasets for points per possession, RAPM, etc.
+
+- Explore more ways to fit the model, such as using random slopes, GLMs and GAMs to capture non-linear relationships between variables to the outcome (points per game).
+
+## Acknowledgments
+
+We would like to give special thanks to:
+
+- **Professor Ron Yurko**, the director of the program and who had offered us great guidance on the methodology,
+- **Katerina Wu**, the external advisor of the program who provided invaluable data and domain knowledge,
+- **Sara Colando** and **Erin Franke**, the program instructors for their lectures,
+- **Princess Allotey**, **JungHo Lee**, and **Yuchen Chen**, the program's Teaching Assistants for their statistical expertise, their presence and willingness to help in the daily labs.
+
+## References
+
+Cole, K., Pearman, F., & Khanna, S. (2026). Big Fish or Little Pond? National Evidence on the Relationship Between Transferring and Athletic Performance Within Division I Men's College Basketball. *Journal of Issues in Intercollegiate Athletics, 19*(1). <https://doi.org/10.51221/sc.jiia.2026.19.1.15>
+
+Gilani, S. (2026). *hoopR: Access Men's Basketball Play by Play Data*. (Version 3.1.0) \[Computer software\]. <https://github.com/sportsdataverse/hoopR>
+
+Gonzalez Sanchez, A., Martinez, S., Yurko, R., Elmore, R., & Macdonald, B. (2024). Beyond the Box Score: Does Icing the Field Goal Kicker Work in the NFL? *CHANCE, 37*(3), 41–48. <https://doi.org/10.1080/09332480.2024.2415841>
+
+## Contact Information and Code Availability
+
+We are happy to answer questions and receive feedback on the presentation of our capstone project. Here are our email information:
+
+- **An Le** (Bates College): [thaianle1102\@gmail.com](mailto:thaianle1102@gmail.com)
+- **Kendall Lucas** (Duquesne University): [kendalllucas724\@gmail.com](mailto:kendalllucas724@gmail.com)
+
+All of our code are available on a public GitHub repository named [`ncaa-capstone-cmsacamp-2026`](https://github.com/thaianle/ncaa-capstone-cmsacamp-2026/tree/main).
