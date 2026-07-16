@@ -74,7 +74,7 @@ Regarding adding new features, two main types of new columns were made. This was
 So, columns indicating a if the player is a transfer for a certain year, if they have transferred before, and how many times they have transferred were added for insight on a player's career path. Along with this, features on a player's previous years metrics were used to see a difference in player's performance between years. A simplified example of what the overall structures of the datasets after adding these columns looks like:
 
 | Player | Year | Team | PPG | MPG | Changed Team | Has Transferred | Cumulative Career Transfers | Previous PPG | Previous MPG |
-|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|
 | H. Dickinson | 2022 | Michigan | 18.6 | 32.6 | FALSE | FALSE | 0 | NA | NA |
 | H. Dickinson | 2023 | Michigan | 17.8 | 33.1 | FALSE | FALSE | 0 | 18.6 | 32.6 |
 | H. Dickinson | 2024 | Kansas | 17.9 | 29.8 | TRUE | TRUE | 1 | 17.8 | 33.1 |
@@ -90,7 +90,7 @@ So, columns indicating a if the player is a transfer for a certain year, if they
 
 ![](side_by_side.png)
 
-[Note that the `side_by_side_correct_3.png` does not work for everyone because this image has not been pushed to the project repo]
+\[Note that the `side_by_side_correct_3.png` does not work for everyone because this image has not been pushed to the project repo\]
 
 Aspects of this graph:
 
@@ -191,7 +191,7 @@ Comparing the effects of different model specifications:
 compare_causal_plot
 ```
 
-[Note that the `theme_set` command does not save the theme in a `.rds` file.]
+\[Note that the `theme_set` command does not save the theme in a `.rds` file.\]
 
 Balance diagnostics (can put these graphs in the Appendix):
 
@@ -203,26 +203,26 @@ match_object_love_plot
 
 ### 1. Implications of the results
 
-[Add some connection between results and domain knowledge]
+\[Add some connection between results and domain knowledge\]
 
 ### 2. Limitations and next steps
 
-- Weirdness in eligibility data (changes in eligibility rules, redshirting, one-and-done, transferring involving outside DI institutions, etc.)
+-   Weirdness in eligibility data (changes in eligibility rules, redshirting, one-and-done, transferring involving outside DI institutions, etc.)
 
-- Transfers for non-athletic-related reasons (eg: academic or proximity to home, NIL, injury, coaching changes) -\> More data collection is needed
+-   Transfers for non-athletic-related reasons (eg: academic or proximity to home, NIL, injury, coaching changes) -\> More data collection is needed
 
-- Points per game might not be an accurate indicator of performance -\> use publicly available datasets for points per possession, RAPM, etc.
+-   Points per game might not be an accurate indicator of performance -\> use publicly available datasets for points per possession, RAPM, etc.
 
-- Explore more ways to fit the model, such as using random slopes, GLMs and GAMs to capture non-linear relationships between variables to the outcome (points per game).
+-   Explore more ways to fit the model, such as using random slopes, GLMs and GAMs to capture non-linear relationships between variables to the outcome (points per game).
 
 ## Acknowledgments
 
 We would like to give special thanks to:
 
-- **Professors Ron Yurko and Zach Branson**, who had offered us great guidance on the methodology for causal inference in sports,
-- **Katerina Wu and Lucca Ferraz** from the University of Pittsburgh Athletics, who provided invaluable data and domain knowledge,
-- **Sara Colando** and **Erin Franke**, the program instructors for their lectures,
-- **Princess Allotey**, **JungHo Lee**, and **Yuchen Chen**, the program's Teaching Assistants for their statistical expertise, their presence and willingness to help in the daily labs.
+-   **Professors Ron Yurko and Zach Branson**, who had offered us great guidance on the methodology for causal inference in sports,
+-   **Katerina Wu and Lucca Ferraz** from the University of Pittsburgh Athletics, who provided invaluable data and domain knowledge,
+-   **Sara Colando** and **Erin Franke**, the program instructors for their lectures,
+-   **Princess Allotey**, **JungHo Lee**, and **Yuchen Chen**, the program's Teaching Assistants for their statistical expertise, their presence and willingness to help in the daily labs.
 
 ## References
 
@@ -242,15 +242,15 @@ Ho, D., Imai, K., King, G., Stuart, E. (2011). MatchIt: Nonparametric Preprocess
 
 We are happy to answer questions and receive feedback on the presentation of our capstone project. Here are our email information:
 
-- **An Le** (Bates College): [thaianle1102\@gmail.com](mailto:thaianle1102@gmail.com)
-- **Kendall Lucas** (Duquesne University): [kendalllucas724\@gmail.com](mailto:kendalllucas724@gmail.com)
+-   **An Le** (Bates College): [thaianle1102\@gmail.com](mailto:thaianle1102@gmail.com)
+-   **Kendall Lucas** (Duquesne University): [kendalllucas724\@gmail.com](mailto:kendalllucas724@gmail.com)
 
 All of our code are available on a public GitHub repository named [`ncaa-capstone-cmsacamp-2026`](https://github.com/thaianle/ncaa-capstone-cmsacamp-2026/tree/main).
 
 ## Appendix 1: Variable naming in equations
 
-[Create a table with variable in mathematical equations (in the Methods section) and their detailed description, some data wrangling steps are important such as changing `exp` to a continuous scale of 1-5]
+\[Create a table with variable in mathematical equations (in the Methods section) and their detailed description, some data wrangling steps are important such as changing `exp` to a continuous scale of 1-5\]
 
 ## Appendix 2: Balance diagnostics for propensity score matching
 
-[Show a table or Love plot: t-test - are the means for the control and treatment groups actually similar?]
+\[Show a table or Love plot: t-test - are the means for the control and treatment groups actually similar?\]
