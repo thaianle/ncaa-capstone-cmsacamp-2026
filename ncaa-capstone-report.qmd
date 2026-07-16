@@ -33,7 +33,13 @@ An enormous part of the NCAA is for a player's ability to transfer, or when the 
 
 -   2024 - **Immediate eligibility no matter how many times athletes transferred**
 
-Due to these new rules, the number of athletes transferring increases each year. This new trend allows for new analysis of college sports. Transferring has a huge impact on coaches, players, and programs as a whole. It allows for easier and quicker access for athletes to find a better fit, coaches to find a missing piece to their roster, and athletic departments to attract new talent to boost their reputation. The effects of transferring could be endless. One of these effects effects all three entities, players, coaches, and schools. What is the effects of transferring on a players performance?
+Due to these new rules, the number of athletes transferring increases each year. This new trend allows for new analysis of college sports.
+
+![](images/clipboard-92248571.png){fig-align="center"}
+
+A academic paper that provided a moderate framework for our research was *Big Fish or Little Pond? National Evidence on the Relationship Between Transferring and Athletic Performance Within Division I Men's College Basketball* (Cole et al.s). In this paper, player categories that could go unnoticed were highlighted and used as predictors. This included indicating if a player was an overperformer/underperformer and the size of program before and after the transfer. The big fish little pond effect was frequently referenced throughout the research process.
+
+Transferring has a huge impact on coaches, players, and programs as a whole. It allows for easier and quicker access for athletes to find a better fit, coaches to find a missing piece to their roster, and athletic departments to attract new talent to boost their reputation. The effects of transferring could be endless. One of these effects effects all three entities, players, coaches, and schools. What is the effects of transferring on a players performance?
 
 ## Data
 
@@ -44,6 +50,8 @@ When it comes to the data used in our research, we used multiple sources. All of
 -   `hoopR` R package part of the **SportsDataverse** ecosystem
 
 -   Proprietary data provided by the University of Pittsburgh Athletics Department
+
+![](images/clipboard-3586035713.png){fig-align="center"}
 
 A simplified example of what the overall structures of these datasets look like:
 
