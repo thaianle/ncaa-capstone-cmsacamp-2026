@@ -74,7 +74,7 @@ Regarding adding new features, two main types of new columns were made. This was
 So, columns indicating a if the player is a transfer for a certain year, if they have transferred before, and how many times they have transferred were added for insight on a player's career path. Along with this, features on a player's previous years metrics were used to see a difference in player's performance between years. A simplified example of what the overall structures of the datasets after adding these columns looks like:
 
 | Player | Year | Team | PPG | MPG | Changed Team | Has Transferred | Cumulative Career Transfers | Previous PPG | Previous MPG |
-|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|
+|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
 | H. Dickinson | 2022 | Michigan | 18.6 | 32.6 | FALSE | FALSE | 0 | NA | NA |
 | H. Dickinson | 2023 | Michigan | 17.8 | 33.1 | FALSE | FALSE | 0 | 18.6 | 32.6 |
 | H. Dickinson | 2024 | Kansas | 17.9 | 29.8 | TRUE | TRUE | 1 | 17.8 | 33.1 |
