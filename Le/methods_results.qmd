@@ -21,6 +21,11 @@ editor: source
 
 ------------------------------------------------------------------------
 
+```{r}
+# Just a code to clear the variables environment
+rm(list = ls())
+```
+
 ## Methods
 
 ### 1. Model selection
@@ -29,43 +34,78 @@ As part of our experimentation with different models, we tested the model in the
 
 Using a multiple linear regression model fitted using OLS, our fixed effects multiple linear regression model set-up is:
 
-$$
-PPG{ijt} = \beta_0 + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{1}
-$$
+$$PPG{ijt} = \beta_0 + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{1}$$
 
 In the mixed effects model, we are just substituting the fixed intercept, $\beta_0$, with a random intercept that is allowed to vary with individual athletes and teams:
 
-$$
-PPG_{ijt} = a_{ij} + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{2}
-$$
+$$PPG_{ijt} = a_{ij} + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{2}$$
 
 where the random intercepts are determined by the equation: $a_{ij} = \alpha_0 + u_{ij}, \quad u_{ij} \sim N(0,\tau^2)$.
 
 Finally, we set up a propensity score matching model, which uses a logistic regression model:
 
-$$
-Transferred_{ijt} = \beta_0 + \beta_1 Position_{it} + \beta_2 Experience_{it} + \beta_3 TeamRating_{jt} + \beta_4 ConfRating_{kt}
-$$
+$$Transferred_{ijt} = \beta_0 + \beta_1 Position_{it} + \beta_2 Experience_{it} + \beta_3 TeamRating_{jt} + \beta_4 ConfRating_{kt}$$
 
 Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference, and $t$ is the year.
 
 ### 2. Robustness checks
 
-In addition, as a robustness check, we attempted to verify the insights made in [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15) about the different effects of transferring when the player had been overperforming or underperforming in the previous year. We used a slightly different definition of over- and underperforming compared to the original paper, using the median points per game as the baseline performance rather than mean points per game. Overperforming means that the player had the points per game higher or equal to the median points per game (top 50% of the team), and underperforming means the opposite. This is because points per game in the teams are very highly skewed, with several top-tier players dominating the scores and a certain number of benched players did not have enough chances to play to create scores.
+In addition, as a robustness check, we attempted to verify the insights made in [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15) about the different effects of transferring when the player had been overperforming or underperforming in the previous year.
+
+We used a slightly different definition of over- and underperforming compared to the original paper, using the median points per game as the baseline performance rather than mean points per game. Overperforming means that the player had the points per game higher or equal to the median points per game (top 50% of the team), and underperforming means the opposite. This is because points per game in the teams are very highly skewed, with several top-tier players dominating the scores and a certain number of benched players did not have enough chances to play to create scores.
+
+As a final note, when we used these robustness checks, the $Transferred$ variable also changed their definition to transferring as an unerperformer (overperformer). The baseline group that we are comparing is players who did not transfer as an underperformer (overperformer), and this contains both players who transferred as an overperformer (underperformer) as well as players who did not transfer *at all* compared to their previous years.
 
 ## Results
 
 (1) Fixed effects or mixed effects model? If mixed effects, which effects?
 
+```{r}
+models_fe_summary <- readRDS("saved/models_fe_summary.rds")
+models_mixed_summary <- readRDS("saved/models_mixed_summary.rds")
+```
+
+The fixed effects model:
+
+```{r}
+models_fe_summary
+```
+
+The mixed effects model:
+
+```{r}
+models_mixed_summary
+```
+
 (2) With and without matching (optional? if so, include balance diagnostics)
+
+```{r}
+models_matching_summary <- readRDS("saved/models_matching_summary.rds")
+compare_causal_plot <- readRDS("saved/compare_causal_plot.rds")
+match_object_love_plot <- readRDS("saved/match_object_love_plot.rds")
+```
+
+```{r}
+models_matching_summary
+```
+
+```{r}
+compare_causal_plot
+```
+
+[Note that the `theme_set` command does not save the theme in a `.rds` file.]
+
+```{r}
+match_object_love_plot
+```
 
 (3) Attempt to replicate the big fish little pond paper [(Cole et al., 2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15)
 
 ## Discussion
 
-[Add some connection between results and domain knowledge]
+\[Add some connection between results and domain knowledge\]
 
-Limitations and next steps:
+### 2. Limitations and next steps:
 
 - Weirdness in eligibility data (changes in eligibility rules, redshirting, one-and-done, transferring involving outside DI institutions, etc.)
 
@@ -79,18 +119,24 @@ Limitations and next steps:
 
 We would like to give special thanks to:
 
-- **Professor Ron Yurko**, the director of the program and who had offered us great guidance on the methodology,
-- **Katerina Wu**, the external advisor of the program who provided invaluable data and domain knowledge,
+- **Professors Ron Yurko and Zach Branson**, who had offered us great guidance on the methodology for causal inference in sports,
+- **Katerina Wu and Lucca Ferraz** from the University of Pittsburgh Athletics, who provided invaluable data and domain knowledge,
 - **Sara Colando** and **Erin Franke**, the program instructors for their lectures,
 - **Princess Allotey**, **JungHo Lee**, and **Yuchen Chen**, the program's Teaching Assistants for their statistical expertise, their presence and willingness to help in the daily labs.
 
 ## References
+
+Bates, D., Maechler, M., Bolker, B., Walker, S. (2015). Fitting Linear Mixed-Effects Models Using lme4. *Journal of Statistical Software, 67*(1), 1-48. <https://doi.org/10.18637/jss.v067.i01>
+
+Brookhart, M. A., Schneeweiss, S., Rothman, K. J., Glynn, R. J., Avorn, J., & Stürmer, T. (2006). Variable selection for propensity score models. *American Journal of Epidemiology, 163*(12), 1149–1156. <https://doi.org/10.1093/aje/kwj149>
 
 Cole, K., Pearman, F., & Khanna, S. (2026). Big Fish or Little Pond? National Evidence on the Relationship Between Transferring and Athletic Performance Within Division I Men's College Basketball. *Journal of Issues in Intercollegiate Athletics, 19*(1). <https://doi.org/10.51221/sc.jiia.2026.19.1.15>
 
 Gilani, S. (2026). *hoopR: Access Men's Basketball Play by Play Data*. (Version 3.1.0) \[Computer software\]. <https://github.com/sportsdataverse/hoopR>
 
 Gonzalez Sanchez, A., Martinez, S., Yurko, R., Elmore, R., & Macdonald, B. (2024). Beyond the Box Score: Does Icing the Field Goal Kicker Work in the NFL? *CHANCE, 37*(3), 41–48. <https://doi.org/10.1080/09332480.2024.2415841>
+
+Ho, D., Imai, K., King, G., Stuart, E. (2011). MatchIt: Nonparametric Preprocessing for Parametric Causal Inference. *Journal of Statistical Software, 42*(8), 1-28. <https://doi.org/10.18637/jss.v042.i08>.
 
 ## Contact Information and Code Availability
 
@@ -100,3 +146,11 @@ We are happy to answer questions and receive feedback on the presentation of our
 - **Kendall Lucas** (Duquesne University): [kendalllucas724\@gmail.com](mailto:kendalllucas724@gmail.com)
 
 All of our code are available on a public GitHub repository named [`ncaa-capstone-cmsacamp-2026`](https://github.com/thaianle/ncaa-capstone-cmsacamp-2026/tree/main).
+
+## Appendix 1: Variable naming in equations
+
+[Create a table with variable in mathematical equations (in the Methods section) and their detailed description, some data wrangling steps are important such as changing `exp` to a continuous scale of 1-5]
+
+## Appendix 2: Balance diagnostics for propensity score matching
+
+[Show a table or Love plot: t-test - are the means for the control and treatment groups actually similar?]
