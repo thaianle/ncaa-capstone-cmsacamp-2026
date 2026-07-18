@@ -1,0 +1,171 @@
+Some useful resources that I happened to find:
+
+- Saving data in R (eg: variable values, fitted models, nicely formatted tables, etc.) to a file in your local computer that you can access later: <https://www.sthda.com/english/wiki/saving-data-into-r-data-format-rds-and-rdata>
+
+- Crossed and nested random effects (with sports examples): <https://optimumsportsperformance.com/blog/crossed-vs-nested-random-effects>
+
+For my methods and results section, I will load the data as RData files instead of copying and pasting all the code to the final report. This also helps the report become much cleaner.
+
+#### 1. Data preprocessing for modeling
+
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+
+library(tidyverse)
+library(lme4) # For mixed effects models
+library(modelsummary) # Display the results of regression models like in publications
+library(MatchIt) # For propensity score matching models
+
+#library(performance)
+#library(broom)
+
+df <- read.csv("player_stats_hoopR.csv")
+df
+```
+
+```{r}
+# Change necessary variable data types for the models to work properly
+df <- df |>
+  mutate(id = as.factor(id),
+         player = as.factor(player),
+         pos = as.factor(pos),
+         team = as.factor(team),
+         conf = as.factor(conf)) |>
+  
+  # Filter out players who have changed team and skipped the year before
+  # (they are likely to transfer out of DI to lower divisions or JUCOs)
+  filter(!(skipped_year_before == 1 & changed_team == 1)) |>
+  
+  # Filter out for NA values in the dataset
+  drop_na(changed_team, prev_ppg, pos, exp, year, current_barthag, current_barthag_conf,
+          id, team, conf)
+
+  # We don't use data influenced by the pandemic period
+
+df
+```
+
+Simple linear regression vs. multiple linear regression without team and player fixed effects vs. crossed and nested random effects and partially crossed and nested random effects:
+
+```{r}
+
+# Simple linear regression (age curve and transfer effects)
+slr_1 <- lm(ppg ~ prev_ppg, data = df)
+slr_2 <- lm(ppg ~ changed_team, data = df)
+
+# Multiple linear regression without player and team effects
+linreg <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+               current_barthag + current_barthag_conf,
+             data = df)
+
+# I wanted to add team and player fixed effects, but this might take ages to run!
+#linreg_2 <- feols(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                    #current_barthag + current_barthag_conf + id + team,
+                  #data = df)
+# https://stackoverflow.com/questions/8389843/double-clustered-standard-errors-for-panel-data
+
+# Mixed effects: Crossed, nested, and partially crossed and nested (additions to linreg)
+mixed_effects_1 <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                          current_barthag + current_barthag_conf +
+                          (1|team) + (1|id),
+                        data = df)
+
+mixed_effects_2 <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                          current_barthag + current_barthag_conf + (1|team/id),
+                        data = df)
+
+mixed_effects_3 <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                          current_barthag + current_barthag_conf + (1|team:id) +
+                          (1|team) + (1|id),
+                        data = df)
+```
+
+```{r}
+# Helper function: Goodness-of-fit metric names of a fixed effects regression model
+# and mixed effects model
+get_gof(linreg)
+get_gof(mixed_effects_3)
+get_estimates(mixed_effects_3)
+```
+
+```{r}
+models_fe <- list(
+  "(1)" = slr_1,
+  "(2)" = slr_2,
+  "(3)" = linreg
+)
+
+# Adjust the coefficients and goodness-of-fit display results for readability
+
+models_fe_coef_map <- c(
+  "changed_team" = "Transferred",
+  "prev_ppg" = "Points per game in previous season",
+  "exp" = "Experience level"
+  #"posforward" = "Position is Forward",
+  #"posguard" = "Position is Guard",
+  #"year" = "Season"
+  #"current_barthag" = "Team rating",
+  #"current_barthag_conf" = "Conference rating"
+)
+
+models_fe_gof_map <- tibble(
+  raw = c("nobs", "adj.r.squared"),
+  clean = c("Number of observations", "Adjusted R<sup>2</sup>"),
+  fmt = c("%.0f", "%.3f")
+)
+
+models_fe_summary <- modelsummary(models_fe, stars = TRUE,
+                                  coef_map = models_fe_coef_map,
+                                  gof_map = models_fe_gof_map)
+models_fe_summary
+```
+
+```{r}
+
+models_mixed <- list(
+  "(1)" = mixed_effects_1,
+  "(2)" = mixed_effects_2,
+  "(3)" = mixed_effects_3
+)
+
+models_mixed_coef_map <- c(
+  "changed_team" = "Transferred",
+  "prev_ppg" = "Points per game in previous season",
+  "exp" = "Experience level",
+  #"posforward" = "Position is Forward",
+  #"posguard" = "Position is Guard",
+  #"year" = "Season",
+  #"conf" = "Conference",
+  #"current_barthag" = "Team rating",
+  #"current_barthag_conf" = "Conference rating",
+  "SD (Intercept teamid)" = "SD (Team × Player)",
+  "SD (Intercept id)" = "SD (Player)",
+  "SD (Intercept team)" = "SD (Team)",
+  "SD (Observations)" = "SD (Observations)"
+)
+
+# Note that conditional R^2 (a.k.a. R^2 that accounts for both fixed and random effects)
+# are not available because there are some random effects with zero intraclass correlation
+
+models_mixed_gof_map <- tibble(
+  raw = c("nobs", "r2.marginal"),
+  clean = c("Number of observations", "Marginal R<sup>2</sup>"),
+  fmt = c("%.0f", "%.3f")
+)
+
+models_mixed_summary <- modelsummary(models_mixed, stars = TRUE,
+                                     coef_map = models_mixed_coef_map,
+                                     gof_map = models_mixed_gof_map)
+models_mixed_summary
+```
+
+#### Saving models and plots to make the final report or presentation cleaner
+
+Note that you need to create a folder in your working directory called `saved` for the code to be reproducible.
+
+```{r}
+# Save the nicely-formatted summary tables to the local computer
+saveRDS(models_fe_summary, "saved/models_fe_summary.rds")
+saveRDS(models_mixed_summary, "saved/models_mixed_summary.rds")
+```

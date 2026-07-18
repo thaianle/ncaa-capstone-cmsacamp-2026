@@ -1,0 +1,520 @@
+Some useful resources that I happened to find:
+
+- Propensity score matching - Caliper width on logit of the propensity score: <https://stackoverflow.com/questions/72223928/how-to-use-matchit-r-package-to-use-caliper-width-on-logit-of-the-propensity-sco>
+
+#### 1. Data preprocessing for modeling
+
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+
+library(tidyverse)
+library(lme4) # For mixed effects models
+library(modelsummary) # Display the results of regression models like in publications
+library(MatchIt) # For propensity score matching models
+library(cobalt) # Generate a ggplot representation of the Love plot
+
+df <- read.csv("player_stats_hoopR.csv")
+df
+```
+
+```{r}
+# Change necessary variable data types for the models to work properly
+df <- df |>
+  mutate(id = as.factor(id),
+         player = as.factor(player),
+         pos = as.factor(pos),
+         team = as.factor(team),
+         conf = as.factor(conf)) |>
+  
+  # Filter out players who have changed team and skipped the year before
+  # (they are likely to transfer out of DI to lower divisions or JUCOs)
+  filter(!(skipped_year_before == 1 & changed_team == 1)) |>
+  
+  # Filter out for NA values in the dataset
+  drop_na(changed_team, prev_ppg, pos, exp, year, current_barthag, current_barthag_conf,
+          id, team, conf)
+
+  # We don't use data influenced by the pandemic period
+
+df
+```
+
+Generate separate datasets for overperformer and underperformer transfers (changing the definition of the variable `changed_team`):
+
+```{r}
+# Changed the definition of transferred variable: only including underperformer transfers
+df_underperf <- df |>
+  mutate(underperf_transfer = changed_team * is_prev_underperformer) |>
+  select(-changed_team) |>
+  rename(changed_team = underperf_transfer)
+```
+
+```{r}
+# Changed the definition of transferred variable: only including overperformer transfers
+df_overperf <- df |>
+  mutate(overperf_transfer = changed_team * is_prev_overperformer) |>
+  select(-changed_team) |>
+  rename(changed_team = overperf_transfer)
+```
+
+Keep the mixed effects model and multiple linear regression model as a baseline for comparison:
+
+```{r}
+# Note that we do not include team and player fixed effects because of the singleton issue
+# and high runtime associated with creating thousands of binary variables
+
+# Normal conditions:
+linreg_normal <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+               current_barthag + current_barthag_conf,
+             data = df)
+
+no_matching_normal <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                             current_barthag + current_barthag_conf + (1|team:id),
+                           data = df)
+
+# Underperformers dataset:
+linreg_underperf <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                         current_barthag + current_barthag_conf,
+                       data = df_underperf)
+
+no_matching_underperf <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                             current_barthag + current_barthag_conf + (1|team:id),
+                           data = df_underperf)
+
+# Overperformers dataset:
+linreg_overperf <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                        current_barthag + current_barthag_conf,
+                       data = df_overperf)
+
+no_matching_overperf <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                             current_barthag + current_barthag_conf + (1|team:id),
+                           data = df_overperf)
+```
+
+Preliminary diagnostics - Approximating ratio to match transfers with non-transfers in all three transfer definitions:
+
+```{r}
+df |>
+  count(changed_team)
+# Approximated ratio: 8335 non-transfers / 4278 transfers = 1.95 ~ 2
+
+df_underperf |>
+  count(changed_team)
+# Approximated ratio: 11058 non-transfers / 1555 transfers = 7.11 ~ 7
+
+df_overperf |>
+  count(changed_team)
+# Approximated ratio: 9898 non-transfers / 2715 transfers = 3.64 ~ 4
+```
+
+### 1. Propensity score matching object implementation
+
+```{r}
+# Functions to automate the propensity score matching workflow without copying and pasting code
+
+propensity_score_matching <- function(my_data, match_ratio = 2) {
+  
+  # my_data: The dataset in question
+
+  # match_ratio: The ratio to match between treatment and control.
+  # This depends on the ratio between transfers and non-transfers for each group.
+  
+  # Function returns the match_object, match_object_data, and mixed_effects_matched for the
+  # dataset. We can consider the result as a "propensity_score_matching" object
+  
+  match_object <- matchit(changed_team ~ pos + exp + current_barthag + current_barthag_conf,
+                          data = my_data, method = "nearest", distance = "glm",
+                          link = "linear.logit", caliper = 0.2, std.caliper = TRUE,
+                          replace = FALSE, ratio = match_ratio)
+
+  match_object_data <- match.data(match_object)
+
+  mixed_effects_matched <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                                  current_barthag + current_barthag_conf + (1|team:id),
+                                data = match_object_data)
+  
+  results <- list("match_object" = match_object, "match_object_data" = match_object_data,
+                  "mixed_effects_matched" = mixed_effects_matched)
+  
+  return(results)
+  
+}
+
+```
+
+```{r}
+# Implement the function with normal conditions, underperformers, and overperformers
+matching_normal <- propensity_score_matching(df, match_ratio = 2)
+matching_underperf <- propensity_score_matching(df_underperf, match_ratio = 7)
+matching_overperf <- propensity_score_matching(df_overperf, match_ratio = 4)
+```
+
+```{r}
+# Obtain individual objects of each propensity score matching specification
+
+match_object_normal <- matching_normal$match_object
+match_object_underperf <- matching_underperf$match_object
+match_object_overperf <- matching_overperf$match_object
+
+match_object_data_normal <- matching_normal$match_object_data
+match_object_data_underperf <- matching_underperf$match_object_data
+match_object_data_overperf <- matching_overperf$match_object_data
+
+mixed_effects_normal <- matching_normal$mixed_effects_matched
+mixed_effects_underperf <- matching_underperf$mixed_effects_matched
+mixed_effects_overperf <- matching_overperf$mixed_effects_matched
+```
+
+### 2. Balance diagnostics for propensity score matching models
+
+Plotting balance diagnostics of the matched models (Love plots) with a large function:
+
+```{r}
+# Function to obtain a nicely formatted Love plot for any propensity score matching data
+
+ps_matching_love_plot <- function(my_data) {
+  
+  # Get the matchit object to create the Love plot
+  love_plot_object <- propensity_score_matching(my_data)$match_object
+  
+  # drop.distance = TRUE: Drop the distance metric when visualizing the Love plot
+  match_object_love_plot <- love.plot(love_plot_object, stat = "mean.diffs",
+                                      var.order = "unadjusted", threshold = 0.1,
+                                      drop.distance = TRUE, binary = "std", abs = TRUE) +
+    
+    # Edit the labels and colors to be colorblind-friendly
+    labs(title = "",
+         color = "Group",
+         x = "Absolute Standardized Mean Differences") +
+    scale_y_discrete(labels = c("exp" = "Experience level",
+                                "current_barthag_conf" = "Conference rating",
+                                "current_barthag" = "Team rating",
+                                "pos_center" = "Position is Center",
+                                "pos_guard" = "Position is Guard",
+                                "pos_forward" = "Position is Forward")) +
+    scale_color_manual(values = c("darkred", "darkblue"),
+                       labels = c("All data", "Matched data")) +
+    
+    # Set the theme and other edits to the plot for aesthetic purposes
+    theme_bw() +
+    
+    theme(
+      # Remove unnecessary vertical gridlines from the graph
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank()
+    )
+
+  # Return the final plot for later use
+  return(match_object_love_plot)
+  
+}
+```
+
+```{r}
+balance_diagnostics_normal <- ps_matching_love_plot(df)
+balance_diagnostics_underperf <- ps_matching_love_plot(df_underperf)
+balance_diagnostics_overperf <- ps_matching_love_plot(df_overperf)
+```
+
+```{r}
+balance_diagnostics_normal
+balance_diagnostics_underperf
+balance_diagnostics_overperf
+```
+
+### 3. Summarize the effects in tabular and graphical format
+
+```{r}
+# Summarize the results in a nicely formatted table
+
+models_matching <- list(
+  "(1)" = mixed_effects_normal,
+  "(2)" = mixed_effects_underperf,
+  "(3)" = mixed_effects_overperf
+)
+
+models_matching_coef_map <- c(
+  "changed_team" = "Transferred",
+  "prev_ppg" = "Points per game in previous season",
+  "exp" = "Experience level",
+  "SD (Intercept teamid)" = "SD (Team × Player)",
+  "SD (Observations)" = "SD (Observations)"
+)
+
+# Note that conditional R^2 (a.k.a. R^2 that accounts for both fixed and random effects)
+# may not be available because there are some random effects with zero intraclass correlation
+
+models_matching_gof_map <- tibble(
+  raw = c("nobs", "r2.marginal", "r2.conditional"),
+  clean = c("Number of observations", "Marginal R<sup>2</sup>", "Conditional R<sup>2</sup>"),
+  fmt = c("%.0f", "%.3f", "%.3f")
+)
+
+models_matching_summary <- modelsummary(models_matching, stars = TRUE,
+                                        coef_map = models_matching_coef_map,
+                                        gof_map = models_matching_gof_map)
+models_matching_summary
+```
+
+Plotting a graph of model point estimates and their confidence intervals (95%):
+
+```{r}
+# Helper function: Extract the point estimates of a named variable and their confidence interval
+# as a dataframe for plotting
+
+compare_causal_models <- function(var_name, model_list) {
+  # var_name: Variable name of interest (need to be the same across all models).
+  # var_name must be in quotes
+  
+  # model_list: List of models (not named) to compare the effects of a variable.
+  # model_list should contain an user-specified name and the model variable itself.
+  
+  # Create a blank dataframe to store the results
+  result <- tibble(
+    model_name = character(),
+    estimate = numeric(),
+    std.error = numeric(),
+    statistic = numeric(),
+    p.value = numeric(),
+    conf.low = numeric(),
+    conf.high = numeric(),
+  )
+  
+  # Extract the estimates and append to the result dataframe
+  for (model_name in names(model_list)) {
+    
+    # Extract the model's name as a value:
+    # https://stackoverflow.com/questions/24309910/how-to-get-name-of-variable-in-r-substitute
+    model <- model_list[[model_name]]
+    
+    model_name_df <- tibble(
+      model_name = c(model_name)
+    )
+    
+    model_df <- get_estimates(model) |>
+      filter(term == var_name) |>
+      select(estimate, std.error, statistic, p.value, conf.low, conf.high)
+    
+    # Combine the model names with model statistics together, then append the result to the
+    # returning dataframe
+    model_df <- bind_cols(model_name_df, model_df)
+    result <- bind_rows(result, model_df)
+  }
+  
+  # Return the resulting dataframe
+  return(result)
+}
+```
+
+```{r}
+# Function to obtain a nicely formatted comparing effects for multiple model configurations
+
+compare_causal_plot <- function(compare_causal_models_df) {
+  # compare_causal_models_df is a dataframe generated from the previous function
+  
+  # Generate a blank canvas and add a zero baseline for reference
+  resulting_plot <- compare_causal_models_df |>
+    ggplot() +
+    geom_vline(xintercept = 0, color = "darkred", linetype = "dashed",
+               linewidth = 0.7, alpha = 0.5) +
+    
+    # Supply the plot with data
+    geom_point(aes(x = estimate, y = model_name), color = "blue", size = 3) +
+    geom_errorbar(aes(xmin = conf.low, xmax = conf.high, y = model_name),
+                  linewidth = 1.1, width = 0.25, orientation = "y") +
+    
+    # Modify axis labels for readability
+    labs(x = "Expected change in points per game following a transfer",
+         y = "") +
+    
+    # Set the theme and other edits to the plot for aesthetic purposes
+    theme_bw() +
+    
+    theme(
+      # Remove unnecessary vertical gridlines from the graph
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank()
+    )
+  
+  # Return the resulting plot
+  return(resulting_plot)
+}
+```
+
+```{r}
+my_model_list <- list("Multiple Linear\nRegression" = linreg_normal,
+                      "Mixed Effects\nWithout Matching" = no_matching_normal,
+                      "Mixed Effects\nWith Matching" = mixed_effects_normal)
+
+model_comparison_df <- compare_causal_models("changed_team", my_model_list)
+compare_causal_plot_all <- compare_causal_plot(model_comparison_df) +
+  theme(
+    axis.text.x = element_text(size = 16),
+    axis.text.y = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16, face = "bold", margin = margin(t = 15)),
+    axis.title.y = element_blank()
+  )
+
+compare_causal_plot_all
+```
+
+```{r}
+full_model_list <- list("Multiple Linear Regression" = linreg_normal,
+                        "Mixed Effects Without Matching" = no_matching_normal,
+                        "Mixed Effects With Matching" = mixed_effects_normal,
+                        
+                        "Multiple Linear Regression 2" = linreg_underperf,
+                        "Mixed Effects Without Matching 2" = no_matching_underperf,
+                        "Mixed Effects With Matching 2" = mixed_effects_underperf,
+                        
+                        "Multiple Linear Regression 3" = linreg_overperf,
+                        "Mixed Effects Without Matching 3" = no_matching_overperf,
+                        "Mixed Effects With Matching 3" = mixed_effects_overperf)
+
+full_model_comparison_df <- compare_causal_models("changed_team", full_model_list) |>
+  cbind(condition = c("All players", "All players", "All players",
+                      "Overperformer transfers only", "Overperformer transfers only",
+                      "Overperformer transfers only", "Underperformer transfers only",
+                      "Underperformer transfers only", "Underperformer transfers only")) |>
+  
+  # Adjust the model names to be similar to each other
+  # Note that we cannot pass similar model names to the list for compare_causal_models function
+  # because of constraints in naming list items in R itself
+  mutate(model_name = rep(c("Multiple Linear\nRegression", "Mixed Effects\nWithout Matching",
+                            "Mixed Effects\nWith Matching"), times = 3)) |>
+  mutate(model_name = factor(model_name, levels = c("Multiple Linear\nRegression",
+                                                    "Mixed Effects\nWithout Matching",
+                                                    "Mixed Effects\nWith Matching")))
+
+full_model_comparison_df
+```
+
+```{r}
+compare_plot_robust <- full_model_comparison_df |>
+  ggplot(aes(y = model_name, x = estimate)) +
+  geom_vline(xintercept = 0, color = "darkred", linetype = "dashed",
+               linewidth = 0.7, alpha = 0.5) +
+  
+  # Supply the plot with data
+  geom_point(color = "blue") +
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high),
+                  width = 0.3, orientation = "y") +
+  facet_wrap(~ condition, scales = "free_x") +
+  
+  # Modify axis labels for readability
+  labs(x = "Expected change in points per game following a transfer",
+       y = "") +
+  
+  # Plot with custom order
+  # Note that the plot shows Mixed Effects with Matching first, then Mixed Effects Without
+  # Matching, then Multiple Linear Regression by default
+  scale_y_discrete(limits = rev) +
+  
+  # Set the theme and other edits to the plot for aesthetic purposes
+  theme_bw() +
+  
+  theme(
+    
+    # Remove unnecessary vertical gridlines from the graph
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    
+    # Adjust textual elements including axis labels and facet plot text
+    axis.title.x = element_text(size = 16, face = "bold", margin = margin(t = 15)),
+    axis.text.x = element_text(size = 16),
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 16, face = "bold", hjust = 0.5),
+    strip.text = element_text(size = 17, face = "bold")
+    
+    )
+  
+compare_plot_robust
+```
+
+#### Additional table visualization to be informative
+
+```{r}
+# Visualize models: linreg_normal, no_matching_normal, and mixed_effects_normal with modelsummary
+
+# Summarize the results in a nicely formatted table
+
+models_matching_add <- list(
+  "(1)" = linreg_normal,
+  "(2)" = no_matching_normal,
+  "(3)" = mixed_effects_normal
+)
+
+models_matching_add_coef_map <- c(
+  "changed_team" = "Transferred",
+  "prev_ppg" = "Points per game in previous season",
+  "exp" = "Experience level",
+  "SD (Intercept teamid)" = "SD (Team × Player)",
+  "SD (Observations)" = "SD (Observations)"
+)
+
+# Note that conditional R^2 (a.k.a. R^2 that accounts for both fixed and random effects)
+# may not be available because there are some random effects with zero intraclass correlation
+
+models_matching_add_gof_map <- tibble(
+  raw = c("nobs", "r2.adjusted", "r2.marginal", "r2.conditional"),
+  clean = c("Number of observations", "Adjusted R<sup>2</sup>",
+            "Marginal R<sup>2</sup>", "Conditional R<sup>2</sup>"),
+  fmt = c("%.0f", "%.3f", "%.3f", "%.3f")
+)
+
+additional_summary <- modelsummary(models_matching_add, stars = TRUE,
+                                   coef_map = models_matching_add_coef_map,
+                                   gof_map = models_matching_add_gof_map,
+                                   output = "saved/model_selection_summary.png")
+additional_summary
+```
+
+
+#### Saving models and plots to make the final report or presentation cleaner
+
+Note that you need to create a folder in your working directory called `saved` for the code to be reproducible.
+
+```{r}
+# Saving for display on a screen (i.e. presentations)
+ggsave("saved/causal_plot_baseline.png", compare_causal_plot_all, width = 8, height = 6)
+ggsave("saved/causal_plot_robust.png", compare_plot_robust, width = 13, height = 6)
+```
+
+For posters, we need to scale up the graphs and axis labels for people to read at a certain distance.
+
+```{r}
+# INSERT CODE LATER
+```
+
+
+```{r, eval = FALSE}
+# Save the propensity score matching model results and diagnostics plots as a checkpoint
+saveRDS(models_matching_summary, "saved/models_matching_summary.rds")
+saveRDS(compare_causal_plot, "saved/compare_causal_plot.rds")
+saveRDS(match_object_love_plot, "saved/match_object_love_plot.rds")
+```
+
+#### Appendices and Drafts
+
+Helper function to assist with the x-axis range of Love plots for balance diagnostics in propensity score matching models created by `MatchIt`:
+
+```{r, eval = FALSE}
+# Helper function to assist with the Love plots:
+
+# Extract the largest standardized mean differences in a matchit summary dataset
+max_std_mean_diff <- function(matchit_summary) {
+  
+  # Extract the standardized mean differences of covariates among all data and matched data
+  sum_all_mean_diff <- as.data.frame(matchit_summary$sum.all) |>
+    select(`Std. Mean Diff.`)
+  sum_matched_mean_diff <- as.data.frame(matchit_summary$sum.matched) |>
+    select(`Std. Mean Diff.`)
+  
+  # Combine two datasets together and return the maximum value of the column
+  result_df <- bind_rows(sum_all_mean_diff, sum_matched_mean_diff)
+  result <- max(result_df$`Std. Mean Diff.`)
+  
+  return(result)
+}
+```
