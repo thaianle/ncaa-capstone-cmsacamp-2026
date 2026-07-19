@@ -28,33 +28,45 @@ rm(list = ls())
 
 ## Methods
 
-### 1. Model selection
+We estimated the effect of transferring on player performance using a mixed effects regression model following propensity score matching. The results that informed our model selection process is mentioned in detail in [Appendix 2](#appendix-2).
 
-As part of our experimentation with different models, we tested the model in the process of increasing complexity. We will test whether a fixed effects or random effects model is needed, then we will test if the propensity score matching is needed to address selection biases associated with players who elected to transfer versus players who did not. The list of variables and subscripts used in our equations can be referred in the below Appendix.
+We also attempted to validate the findings of [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15) about the differential effects of transferring on player performance related to whether the player was overperforming or underperforming in their previous season at the NCAA Division I men's basketball. By changing the definition of the $\text{Transferred}$ variable to only include players who transferred as overperformers (above or equal to the median performance among all players in the team) and underperformers (below the median performance among all players in the team), we expected to see a more pronounced effect of transferring on player performance.
 
-Using a multiple linear regression model fitted using OLS, our fixed effects multiple linear regression model set-up is:
+### 1. Propensity score matching
 
-$$PPG{ijt} = \beta_0 + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{1}$$
+First, we performed propensity score matching using the MatchIt package in R [(Ho et al., 2011)](https://doi.org/10.18637/jss.v042.i08). As certain groups of players are more likely to transfer than others, the matching ruled out possibilities of a selection bias when making inferences about the effect of transferring on player performance.
 
-In the mixed effects model, we are just substituting the fixed intercept, $\beta_0$, with a random intercept that is allowed to vary with individual athletes and teams:
+The process involved matching a transferred player to $n$ non-transferred players without replacement. Here, $n$ is an integer representing the approximate ratio of the number of transfers to the number of non-transfers. Using our exploratory data analysis, $n$ equals $2$ if we considered all types of transfers, $7$ for overperformer transfers, and $4$ for underperformer transfers. Our flexible choice of the matching ratio allowed us to obtain a representative sample of NCAA players after the matching process.
 
-$$PPG_{ijt} = a_{ij} + \beta_1 Transferred_{ij} + \beta_2 PPG_{i,t-1} + \beta_3 Position_{i} + \beta_4 Experience_{it} + \beta_5 t +\\ \beta_6 Conference_{kt} + \beta_7 TeamRating_{jt} + \beta_8 ConfRating_{kt} + \epsilon_{ijkt} \tag{2}$$
+We specified the following logistic regression model to determine the propensity scores associated with how likely each player is an incoming transfer for each player and year combination:
 
-where the random intercepts are determined by the equation: $a_{ij} = \alpha_0 + u_{ij}, \quad u_{ij} \sim N(0,\tau^2)$.
+$$
+\widehat{\text{Transferred}_{ijkt}} = \beta_1 \text{Position}_i + \beta_2 \text{Experience}_{it} + \beta_3 \text{TeamRating}_{jt} + \beta_4 \text{ConfRating}_{kt}
+$$
 
-Finally, we set up a propensity score matching model, which uses a logistic regression model:
+Regarding the matching method, we used MatchIt's default nearest neighbor matching and set the caliper width to "$0.2$ the standard deviation of the logit of the propensity score" using the recommendation from [Austin (2011)](https://doi.org/10.1002/pst.433), which prevents players with vastly different statistics to be matched with each other. For the variable selection, we only included covariates that could affect a player's performance, but do not necessarily affect their choice of staying in the team or transferring. According to [Brookhart et al. (2006)](https://doi.org/10.1093/aje/kwj149), this choice of variables would improve the accuracy of our inferences because it would decrease the variance of our estimated effects of a transfer without increasing bias.
 
-$$Transferred_{ijt} = \beta_0 + \beta_1 Position_{it} + \beta_2 Experience_{it} + \beta_3 TeamRating_{jt} + \beta_4 ConfRating_{kt}$$
+Before we proceeded to fitting a regression model on the matched data, we constructed Love plots to check for balance between the treatment group and control group, which is outlined in [Appendix 3](#appendix-3). In the matched data, all covariates had an absolute standardized mean difference of less than or equal to $0.1$, which implies that the treatment and control groups were similar and we had properly controlled for confounding variables related to players' choices to transfer.
 
-Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference, and $t$ is the year.
+### 2. Mixed effects regression model
 
-### 2. Robustness checks
+After we controlled for selection biases in players' transfer decisions using propensity score matching, we fit a mixed effects regression model on the matched data to precisely determine the effect of transferring on player performance, controlling for more factors such as individual athletic ability and team context. Here, we quantified a player's performance by their points per game (PPG), since this metric is easily accessible and interpretable for non-statistical audiences.
 
-In addition, as a robustness check, we attempted to verify the insights made in [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15) about the different effects of transferring when the player had been overperforming or underperforming in the previous year.
+The full equation for our mixed effects regression model is:
 
-We used a slightly different definition of over- and underperforming compared to the original paper, using the median points per game as the baseline performance rather than mean points per game. Overperforming means that the player had the points per game higher or equal to the median points per game (top 50% of the team), and underperforming means the opposite. This is because points per game in the teams are very highly skewed, with several top-tier players dominating the scores and a certain number of benched players did not have enough chances to play to create scores.
+$$
+\widehat{\text{PPG}_{ijkt}} = a_{ij} + \beta_1 \text{Transferred}_{ij} + \beta_2 t + \beta_3 \text{PPG}_{i,t-1} + \beta_4 \text{Position}_{i} + \beta_5 \text{Experience}_{it} +\\ \beta_6 \text{Conference}_{kt} + \beta_7 \text{TeamRating}_{jt} + \beta_8 \text{ConfRating}_{kt} + \epsilon_{ijkt}
+$$
 
-As a final note, when we used these robustness checks, the $Transferred$ variable also changed their definition to transferring as an unerperformer (overperformer). The baseline group that we are comparing is players who did not transfer as an underperformer (overperformer), and this contains both players who transferred as an overperformer (underperformer) as well as players who did not transfer *at all* compared to their previous years.
+In this model, the coefficients numbered from $\beta_1$ to $\beta_8$, represents the fixed effects, and $\epsilon_{ijkt}$ represents the error term.
+
+Using the model selection results from [Appendix 2](#appendix-2) and domain knowledge, we specify an intercept $a_{ij}$ specific to each player and team combination:
+
+$$
+a_{ij} = \alpha_0 + u_{ij}, \quad \quad u_{ij} \sim N(0,\tau^2).
+$$
+
+The coefficient $\beta_1$ for the $\text{Transferred}$ variable would give the magnitude of the effect of transferring on a player's points per game in the current year, while the standard error associated with that coefficient would determine the statistical significance of our estimates.
 
 ## Results
 
@@ -93,7 +105,7 @@ models_matching_summary
 compare_causal_plot
 ```
 
-[Note that the `theme_set` command does not save the theme in a `.rds` file.]
+\[Note that the `theme_set` command does not save the theme in a `.rds` file.\]
 
 ```{r}
 match_object_love_plot
@@ -126,6 +138,8 @@ We would like to give special thanks to:
 
 ## References
 
+Austin, P. C. (2011). Optimal caliper widths for propensity‐score matching when estimating differences in means and differences in proportions in observational studies. *Pharmaceutical Statistics, 10*(2), 150–161. <https://doi.org/10.1002/pst.433>
+
 Bates, D., Maechler, M., Bolker, B., Walker, S. (2015). Fitting Linear Mixed-Effects Models Using lme4. *Journal of Statistical Software, 67*(1), 1-48. <https://doi.org/10.18637/jss.v067.i01>
 
 Brookhart, M. A., Schneeweiss, S., Rothman, K. J., Glynn, R. J., Avorn, J., & Stürmer, T. (2006). Variable selection for propensity score models. *American Journal of Epidemiology, 163*(12), 1149–1156. <https://doi.org/10.1093/aje/kwj149>
@@ -149,8 +163,14 @@ All of our code are available on a public GitHub repository named [`ncaa-capston
 
 ## Appendix 1: Variable naming in equations
 
-[Create a table with variable in mathematical equations (in the Methods section) and their detailed description, some data wrangling steps are important such as changing `exp` to a continuous scale of 1-5]
+\[Create a table with variable in mathematical equations (in the Methods section) and their detailed description, some data wrangling steps are important such as changing `exp` to a continuous scale of 1-5\]
 
-## Appendix 2: Balance diagnostics for propensity score matching
+Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference, and $t$ is the year.
 
-[Show a table or Love plot: t-test - are the means for the control and treatment groups actually similar?]
+## Appendix 2: Model selection process {#appendix-2}
+
+\[Fixed vs random effects model\]
+
+## Appendix 3: Balance diagnostics for propensity score matching {#appendix-3}
+
+\[Show a table or Love plot: t-test - are the means for the control and treatment groups actually similar?\]

@@ -373,7 +373,7 @@ full_model_list <- list("Multiple Linear Regression" = linreg_normal,
                         "Mixed Effects With Matching 3" = mixed_effects_overperf)
 
 full_model_comparison_df <- compare_causal_models("changed_team", full_model_list) |>
-  cbind(condition = c("All players", "All players", "All players",
+  cbind(condition = c("All transfers", "All transfers", "All transfers",
                       "Overperformer transfers only", "Overperformer transfers only",
                       "Overperformer transfers only", "Underperformer transfers only",
                       "Underperformer transfers only", "Underperformer transfers only")) |>
@@ -484,7 +484,48 @@ ggsave("saved/causal_plot_robust.png", compare_plot_robust, width = 13, height =
 For posters, we need to scale up the graphs and axis labels for people to read at a certain distance.
 
 ```{r}
-# INSERT CODE LATER
+# Comparing effects if we consider all types of transfers as a whole
+
+compare_plot_robust_poster <- full_model_comparison_df |>
+  ggplot(aes(y = model_name, x = estimate)) +
+  geom_vline(xintercept = 0, color = "darkred", linetype = "dashed",
+               linewidth = 2, alpha = 0.5) +
+  
+  # Supply the plot with data
+  geom_point(color = "blue", size = 8) +
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high),
+                  width = 0.3, orientation = "y", linewidth = 2) +
+  facet_wrap(~ condition, scales = "free_x") +
+  
+  # Modify axis labels for readability
+  labs(x = "Expected change in points per game following a transfer",
+       y = "") +
+  
+  # Plot with custom order
+  # Note that the plot shows Mixed Effects with Matching first, then Mixed Effects Without
+  # Matching, then Multiple Linear Regression by default
+  scale_y_discrete(limits = rev) +
+  
+  # Set the theme and other edits to the plot for aesthetic purposes
+  theme_bw() +
+  
+  theme(
+    
+    # Remove unnecessary vertical gridlines from the graph
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    
+    # Adjust textual elements including axis labels and facet plot text
+    axis.title.x = element_text(size = 40, face = "bold", margin = margin(t = 15)),
+    axis.text.x = element_text(size = 40),
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 40, face = "bold", hjust = 0.5),
+    strip.text = element_text(size = 40, face = "bold")
+    
+    )
+
+ggsave("saved/poster_causal_plot_robust.png", compare_plot_robust_poster,
+       width = 35, height = 10)
 ```
 
 

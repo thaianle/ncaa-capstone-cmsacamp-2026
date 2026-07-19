@@ -19,8 +19,7 @@ df
 df <- df |>
   mutate(id = as.factor(id),
          player = as.factor(player),
-         pos = as.factor(pos),
-         exp = factor(exp, levels = c("Fr", "So", "Jr", "Sr", "SSr")))
+         pos = as.factor(pos))
 ```
 
 ```{r}
@@ -315,3 +314,29 @@ mixed_effects_conf <- lmer(ppg ~ prev_ppg + pos + exp + team +
 
 summary(mixed_effects_conf)
 ```
+
+```{r}
+mixed_effects_2 <- lmer(ppg ~ prev_ppg + pos + exp + conf +
+                          year + current_barthag + (1|id) + (1|team),
+                        data = non_transfers)
+summary(mixed_effects_2)
+```
+
+```{r}
+library(merTools)
+mixed_effects_data <- REsim(mixed_effects_2)
+plotREsim(mixed_effects_data)
+```
+
+```{r}
+mixed_effects_data |>
+  filter(groupFctr == "id") |>
+  plotREsim()
+```
+
+```{r}
+non_transfers |>
+  ggplot(aes(x = ppg)) +
+  geom_histogram()
+```
+
