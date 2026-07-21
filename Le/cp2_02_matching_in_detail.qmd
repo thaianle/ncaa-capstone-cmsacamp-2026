@@ -196,13 +196,28 @@ ps_matching_love_plot <- function(my_data) {
     scale_color_manual(values = c("darkred", "darkblue"),
                        labels = c("All data", "Matched data")) +
     
+    # Scale up the zero line and the 0.1 threshold line
+    geom_vline(xintercept = 0, color = "black") +
+    geom_vline(xintercept = 0.1, color = "darkorange",
+               linewidth = 0.7, alpha = 0.5, linetype = "dashed") +
+    
     # Set the theme and other edits to the plot for aesthetic purposes
     theme_bw() +
     
     theme(
       # Remove unnecessary vertical gridlines from the graph
       panel.grid.major.y = element_blank(),
-      panel.grid.minor.y = element_blank()
+      panel.grid.minor.y = element_blank(),
+      
+      # Scale up text to show in presentation and report
+      axis.text.x = element_text(size = 16),
+      axis.text.y = element_text(size = 16, face = "bold", hjust = 0.5),
+      axis.title.x = element_text(size = 16, face = "bold", margin = margin(t = 15)),
+      axis.title.y = element_blank(),
+      
+      # We also need to scale up the legends
+      legend.title = element_text(size = 16, face = "bold", hjust = 0.5),
+      legend.text = element_text(size = 16)
     )
 
   # Return the final plot for later use
@@ -222,6 +237,28 @@ balance_diagnostics_normal
 balance_diagnostics_underperf
 balance_diagnostics_overperf
 ```
+
+```{r}
+# Scale down graph labels to be appropriate for a report
+
+report_balance_diagnostics_normal <- balance_diagnostics_normal +
+    theme(
+      axis.text.x = element_text(size = 13),
+      axis.text.y = element_text(size = 13, face = "bold", hjust = 0.5),
+      axis.title.x = element_text(size = 13, face = "bold", margin = margin(t = 15)),
+      axis.title.y = element_blank(),
+      
+      legend.title = element_text(size = 13, face = "bold", hjust = 0.5),
+      legend.text = element_text(size = 13)
+    )
+#balance_diagnostics_underperf
+#balance_diagnostics_overperf
+
+report_balance_diagnostics_normal
+
+ggsave("saved/report_love_plot_all.png", report_balance_diagnostics_normal, width = 8, height = 6)
+```
+
 
 ### 3. Summarize the effects in tabular and graphical format
 
@@ -323,6 +360,9 @@ compare_causal_plot <- function(compare_causal_models_df) {
     geom_point(aes(x = estimate, y = model_name), color = "blue", size = 3) +
     geom_errorbar(aes(xmin = conf.low, xmax = conf.high, y = model_name),
                   linewidth = 1.1, width = 0.25, orientation = "y") +
+    # Use vjust with geom_text to move labels of point estimates up a little
+    geom_text(aes(label = round(estimate, 3), x = estimate, y = model_name),
+              vjust = -0.9, fontface = "bold", size = 6, color = "black") +
     
     # Modify axis labels for readability
     labs(x = "Expected change in points per game following a transfer",
@@ -374,9 +414,9 @@ full_model_list <- list("Multiple Linear Regression" = linreg_normal,
 
 full_model_comparison_df <- compare_causal_models("changed_team", full_model_list) |>
   cbind(condition = c("All transfers", "All transfers", "All transfers",
-                      "Overperformer transfers only", "Overperformer transfers only",
-                      "Overperformer transfers only", "Underperformer transfers only",
-                      "Underperformer transfers only", "Underperformer transfers only")) |>
+                      "Underperformer transfers only", "Underperformer transfers only",
+                      "Underperformer transfers only", "Overperformer transfers only",
+                      "Overperformer transfers only", "Overperformer transfers only")) |>
   
   # Adjust the model names to be similar to each other
   # Note that we cannot pass similar model names to the list for compare_causal_models function
@@ -391,6 +431,9 @@ full_model_comparison_df
 ```
 
 ```{r}
+# library(ggrepel)
+# Ensure that the text does not touch the data points or error bars with geom_text_repel
+
 compare_plot_robust <- full_model_comparison_df |>
   ggplot(aes(y = model_name, x = estimate)) +
   geom_vline(xintercept = 0, color = "darkred", linetype = "dashed",
@@ -400,6 +443,8 @@ compare_plot_robust <- full_model_comparison_df |>
   geom_point(color = "blue") +
   geom_errorbar(aes(xmin = conf.low, xmax = conf.high),
                   width = 0.3, orientation = "y") +
+  geom_text(aes(label = round(estimate, 3), x = estimate, y = model_name),
+            nudge_y = 0.3, fontface = "bold", size = 6, color = "black") +
   facet_wrap(~ condition, scales = "free_x") +
   
   # Modify axis labels for readability
@@ -477,6 +522,10 @@ Note that you need to create a folder in your working directory called `saved` f
 
 ```{r}
 # Saving for display on a screen (i.e. presentations)
+ggsave("saved/love_plot_all.png", balance_diagnostics_normal, width = 8, height = 6)
+ggsave("saved/love_plot_underperf.png", balance_diagnostics_underperf, width = 8, height = 6)
+ggsave("saved/love_plot_overperf.png", balance_diagnostics_overperf, width = 8, height = 6)
+
 ggsave("saved/causal_plot_baseline.png", compare_causal_plot_all, width = 8, height = 6)
 ggsave("saved/causal_plot_robust.png", compare_plot_robust, width = 13, height = 6)
 ```
@@ -495,6 +544,8 @@ compare_plot_robust_poster <- full_model_comparison_df |>
   geom_point(color = "blue", size = 8) +
   geom_errorbar(aes(xmin = conf.low, xmax = conf.high),
                   width = 0.3, orientation = "y", linewidth = 2) +
+  geom_text(aes(label = round(estimate, 3), x = estimate, y = model_name),
+            nudge_y = 0.3, fontface = "bold", size = 13, color = "black") +
   facet_wrap(~ condition, scales = "free_x") +
   
   # Modify axis labels for readability

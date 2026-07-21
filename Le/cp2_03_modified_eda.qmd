@@ -1,0 +1,365 @@
+#### 0. Some more data preprocessing to fit with the other code files
+
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+
+library(tidyverse)
+
+df <- read.csv("player_stats_hoopR.csv")
+df
+```
+
+```{r}
+# Change necessary variable data types for the models to work properly
+df <- df |>
+  mutate(id = as.factor(id),
+         player = as.factor(player),
+         pos = as.factor(pos),
+         team = as.factor(team),
+         conf = as.factor(conf)) |>
+  
+  # Filter out players who have changed team and skipped the year before
+  # (they are likely to transfer out of DI to lower divisions or JUCOs)
+  filter(!(skipped_year_before == 1 & changed_team == 1)) |>
+  
+  # Filter out for NA values in the dataset
+  drop_na(changed_team, ppg, prev_ppg, pos, exp, year, current_barthag,
+          current_barthag_conf, id, team, conf)
+
+  # We don't use data influenced by the pandemic period
+
+df
+```
+
+#### 1. A more beautifully formatted version of the dataframe
+
+```{r}
+library(gt)
+
+# Random seed to ensure that our sample of the dataset is consistent each time we run the code
+set.seed(275225)
+
+beautifully_formatted_table <- df |>
+  slice_sample(n = 5) |>
+  select(id, player, year, team, pos, exp, changed_team, ppg) |>
+  gt() |>
+  # Rename the columns in the gt table
+  cols_label(
+    id = "Player ID", player = "Player name", year = "Season", team = "Team",
+    pos = "Position", exp = "Experience level", changed_team = "Incoming transfer?",
+    ppg = "Points per game"
+  ) |>
+  # Bold the column labels
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  ) |>
+  # Align all columns to center
+  cols_align(
+    align = "center", columns = everything()
+  )
+
+beautifully_formatted_table
+# gtsave(beautifully_formatted_table, "saved/beautifully_formatted_table.png", expand = 3)
+```
+
+#### 2. Make the font size of the EDA curve look bigger? (thanks to Kendall's code)
+
+```{r}
+library(patchwork)
+
+before_after_ppg <- df |>
+  filter(changed_team == TRUE) |>
+  filter(ppg > 1 & prev_ppg > 1) |>
+  ggplot(aes(x = prev_ppg, y = ppg)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red",
+              linewidth = 1.5, linetype = "dashed") + 
+  labs(x = "Before transfer",
+       y = "After transfer",
+       title = "Points per game") +
+  
+  # Customize the theme of the plot and rescale the size of plot labels
+  theme_bw() +
+  
+  theme(axis.title.x = element_text(size = 16, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 16, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+        plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 16, vjust = -2.5),
+        axis.text = element_text(size = 16),
+        legend.text = element_text(size = 16))
+
+# mpg in cbbdata is not the same as min_pct in hoopR
+# They still communicate the same message anyway
+before_after_mpg <- df |>
+  filter(changed_team == 1) |>
+  filter(min_pct > 5 & prev_min_pct > 5) |>
+  ggplot(aes(x = prev_min_pct, y = min_pct)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth() +
+  geom_abline(intercept = 0, slope = 1, color = "red",
+              linewidth = 1.5, linetype = "dashed") +
+  labs(x = "Before transfer",
+       y = "After transfer",
+       title = "Percentage of minutes available played") +
+
+  theme_bw() +
+  
+  theme(axis.title.x = element_text(size = 16, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 16, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+        plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 16, vjust = -2.5),
+        axis.text = element_text(size = 16),
+        legend.text = element_text(size = 16))
+
+# put these side by side
+side_by_side <- before_after_mpg + plot_spacer() +
+  before_after_ppg + plot_layout(widths = c(4, 0.5, 4))
+
+side_by_side
+
+ggsave("saved/before_after_transfer.png", side_by_side, width = 12, height = 6)
+```
+
+```{r}
+# Make a poster version of the same plot
+
+before_after_ppg_poster <- df |>
+  filter(changed_team == TRUE) |>
+  filter(ppg > 1 & prev_ppg > 1) |>
+  ggplot(aes(x = prev_ppg, y = ppg)) +
+  geom_point(alpha = 0.2, size = 8) +
+  geom_smooth(linewidth = 3) +
+  geom_abline(intercept = 0, slope = 1, color = "red",
+              linewidth = 2.5, linetype = "dashed") + 
+  labs(x = "Before transfer\n",
+       y = "\nAfter transfer",
+       title = "Points per game") +
+  
+  # Customize the theme of the plot and rescale the size of plot labels
+  theme_bw() +
+  
+  theme(axis.title.x = element_text(size = 40, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 40, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 40, hjust = 0.5, face = "bold"),
+        plot.title = element_text(size = 40, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 40, vjust = -2.5),
+        axis.text = element_text(size = 40),
+        legend.text = element_text(size = 40))
+
+# mpg in cbbdata is not the same as min_pct in hoopR
+# They still communicate the same message anyway
+before_after_mpg_poster <- df |>
+  filter(changed_team == 1) |>
+  filter(min_pct > 5 & prev_min_pct > 5) |>
+  ggplot(aes(x = prev_min_pct, y = min_pct)) +
+  geom_point(alpha = 0.2, size = 8) +
+  geom_smooth(linewidth = 3) +
+  geom_abline(intercept = 0, slope = 1, color = "red",
+              linewidth = 2.5, linetype = "dashed") +
+  labs(x = "Before transfer\n",
+       y = "\nAfter transfer",
+       title = "Percentage of minutes available played") +
+
+  theme_bw() +
+  
+  theme(axis.title.x = element_text(size = 40, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 40, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 40, hjust = 0.5, face = "bold"),
+        plot.title = element_text(size = 40, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 40, vjust = -2.5),
+        axis.text = element_text(size = 40),
+        legend.text = element_text(size = 40))
+
+# put these side by side
+side_by_side_poster <- before_after_mpg_poster + plot_spacer() +
+  before_after_ppg_poster + plot_layout(widths = c(4, 0.5, 4))
+
+ggsave("saved/poster_before_after_transfer.png", side_by_side_poster,
+       width = 20, height = 10)
+```
+
+
+#### 3. Recreating the "age curve" in the first checkpoint
+
+```{r}
+age_curves_dataset <- df |>
+  
+  # Select the necessary columns only
+  select(exp, has_transferred, changed_team, cumulative_career_transfers, ppg) |>
+  
+  # Fill in NA values for players who have never transferred in their career,
+  # and redefine "cumulative career transfers" to include players who have ever
+  # left their first school after their first year
+  mutate(cumulative_career_transfers = replace_na(cumulative_career_transfers, 0)) |>
+  mutate(large_cumul_transfers = as.numeric(cumulative_career_transfers >= 1)) |>
+  select(-cumulative_career_transfers) |>
+  
+  # Get the mean points per game of players of different types,
+  # as well as certain numbers to help with calculating the confidence interval
+  group_by(exp, has_transferred, changed_team, large_cumul_transfers) |>
+  summarize(mean_ppg = mean(ppg),
+            sd_ppg = sd(ppg),
+            n = n()) |>
+  ungroup() |>
+  
+  # Add confidence intervals of PPG for each group, given mean and SD
+  # https://r-resources.massey.ac.nz/rgcookbook/RECIPE-DATAPREP-SUMMARIZE-SE.html
+  # https://sape.inf.usi.ch/quick-reference/ggplot2/geom_pointrange.html
+  
+  # We use the t-distribution because we consider this dataset as just a sample
+  # qt(...) to find the critical value associated with 95% confidence interval
+  # with a pre-specified degree of freedom
+  mutate(standard_error = sd_ppg / sqrt(n),
+         degrees_of_freedom = n - 1) |>
+  mutate(ci_low = mean_ppg - abs(qt(p = 0.025, df = degrees_of_freedom)) * standard_error,
+         ci_high = mean_ppg + abs(qt(p = 0.025, df = degrees_of_freedom)) * standard_error) |>
+  
+  # Rename columns and add labels for different player types to fit with a plot
+  mutate(transfer_type = case_when(
+    has_transferred == 0 & changed_team == 0 ~ "Never transferred",
+    has_transferred == 1 & changed_team == 1 ~ "Incoming transfer",
+    has_transferred == 1 & changed_team == 0 &
+      large_cumul_transfers == 0 ~ "Has not transferred yet",
+    has_transferred == 1 & changed_team == 0 &
+      large_cumul_transfers == 1 ~ "2+ years after last transfer"
+    ),
+    exp_word = case_when(
+      exp == 1 ~ "Freshman", exp == 2 ~ "Sophomore", exp == 3 ~ "Junior",
+      exp == 4 ~ "Senior", exp == 5 ~ "Super-senior"
+    )) |>
+  
+  mutate(exp_word = factor(exp_word, levels = c("Freshman", "Sophomore", "Junior",
+                                                "Senior", "Super-senior")))
+
+age_curves_dataset
+```
+
+```{r}
+age_curves_plot <- age_curves_dataset |>
+  # The base plot
+  ggplot(aes(x = exp_word, y = mean_ppg, color = transfer_type)) +
+  geom_point() + geom_line(aes(group = transfer_type)) +
+  
+  # Set the limit for the y-axis to avoid misleading the audience
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, 2)) +
+  
+  # Set the general theme for the plot
+  theme_bw() +
+  
+  # Set the colors for each line
+  scale_color_manual(values = c("red", "blue", "darkgreen", "goldenrod")) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(nrow = 2)) +
+
+  # Refine axis, tick marks, and legend titles
+  # Note that I need to add an artificial margin (newline) at the y-axis title so that ggsave
+  # does not cut off part of the title
+  labs(x = "Player's year in college",
+       y = "\nMean points per game",
+       color = "Type of player") +
+  
+  # Slightly adjust the position of axis titles and captions
+  # Increase the size of axis labels and tick marks for readability
+  theme(axis.title.x = element_text(size = 16, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 16, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+        axis.text = element_text(size = 16),
+        legend.text = element_text(size = 16))
+
+age_curves_plot
+
+ggsave("saved/age_curve.png", age_curves_plot, width = 10, height = 4)
+```
+
+```{r}
+# Make a poster version of the same age curve plot
+
+age_curves_plot_poster <- age_curves_dataset |>
+  # The base plot
+  ggplot(aes(x = exp_word, y = mean_ppg, color = transfer_type)) +
+  geom_point(size = 8) + geom_line(aes(group = transfer_type), linewidth = 2) +
+  
+  # Set the limit for the y-axis to avoid misleading the audience
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, 2)) +
+  
+  # Set the general theme for the plot
+  theme_bw() +
+  
+  # Set the colors for each line
+  scale_color_manual(values = c("red", "blue", "darkgreen", "goldenrod")) +
+  #theme(legend.position = "bottom") +
+  #guides(color = guide_legend(nrow = 2)) +
+
+  # Refine axis, tick marks, and legend titles
+  # Note that I need to add an artificial margin (newline) at the y-axis title so that ggsave
+  # does not cut off part of the title
+  labs(x = "Player's year in college\n",
+       y = "\nMean points per game",
+       color = "Type of player") +
+  
+  # Slightly adjust the position of axis titles and captions
+  # Increase the size of axis labels and tick marks for readability
+  # Rotate the x-axis labels by 45 degrees
+  theme(axis.title.x = element_text(size = 50, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 50, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 50, hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(size = 50, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 50),
+        legend.text = element_text(size = 50))
+        # Increase the margins of the legend box
+        #legend.margin = margin(l = 30),
+        #legend.box.spacing = unit(1, "in"))
+
+ggsave("saved/poster_age_curve.png", age_curves_plot_poster, width = 20, height = 15)
+```
+
+Adding standard errors to age curve:
+
+```{r}
+age_curves_plot_se <- age_curves_dataset |>
+  # The base plot
+  ggplot(aes(x = exp_word, y = mean_ppg)) +
+  # group = 1 to make sure the ribbon is shown properly
+  geom_ribbon(aes(ymin = ci_low, ymax = ci_high, fill = transfer_type,
+                  group = 1), alpha = 0.5) +
+  geom_point(aes(color = transfer_type)) +
+  geom_line(aes(color = transfer_type, group = transfer_type)) +
+  facet_wrap(~ transfer_type) +
+  
+  # Set the limit for the y-axis to avoid misleading the audience
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, 4)) +
+  
+  # Set the general theme for the plot
+  theme_bw() +
+  
+  # Set the colors for each line
+  scale_color_manual(values = c("red", "blue", "darkgreen", "goldenrod")) +
+  scale_fill_manual(values = c("red", "blue", "darkgreen", "goldenrod")) +
+  theme(legend.position = "none") + # Disable legend
+
+  # Refine axis, tick marks, and legend titles
+  # Note that I need to add an artificial margin (newline) at the y-axis title so that ggsave
+  # does not cut off part of the title
+  labs(x = "Player's year in college\n",
+       y = "\nMean points per game",
+       color = "Type of player") +
+  
+  # Slightly adjust the position of axis titles and captions
+  # Increase the size of axis labels and tick marks for readability
+  theme(axis.title.x = element_text(size = 16, vjust = -1.5, face = "bold"),
+        axis.title.y = element_text(size = 16, vjust = 3.5, face = "bold"),
+        legend.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(size = 16, angle = 15, hjust = 1, vjust = 1),
+        axis.text.y = element_text(size = 16),
+        strip.text = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 16))
+
+age_curves_plot_se
+
+ggsave("saved/age_curve_se.png", age_curves_plot_se, width = 10, height = 4)
+```
