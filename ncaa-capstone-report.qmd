@@ -162,52 +162,53 @@ $$
 
 The coefficient $\beta_1$ for the $\text{Transferred}$ variable would give the magnitude of the effect of transferring on a player's points per game in the current year, while the standard error associated with that coefficient would determine the statistical significance of our estimates.
 
-## Results
+## Results \[IN PROGRESS\]
 
-(1) Fixed effects or mixed effects model? If mixed effects, which effects?
-
-```{r}
-models_fe_summary <- readRDS("Le/saved/models_fe_summary.rds")
-models_mixed_summary <- readRDS("Le/saved/models_mixed_summary.rds")
-```
-
-The fixed effects model:
-
-```{r}
-models_fe_summary
-```
-
-The mixed effects model:
-
-```{r}
-models_mixed_summary
-```
+**1. In aggregate, what is the effects of transferring on the number of points per game that a player gets in an NCAA basketball season?**
 
 ```{r}
 models_matching_summary <- readRDS("Le/saved/models_matching_summary.rds")
 compare_causal_plot <- readRDS("Le/saved/compare_causal_plot.rds")
 match_object_love_plot <- readRDS("Le/saved/match_object_love_plot.rds")
+summary_in_aggregate <- readRDS("Le/saved/summary_in_aggregate.rds")
 ```
 
-My attempt to replicate the big fish little pond paper [(Cole et al., 2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15)
+```{r}
+#| label: tbl-summary-in-aggregate
+#| tbl-cap: Effects of Transferring and Other Useful Factors on Player Performance, in Aggregate
+
+summary_in_aggregate
+
+# Cross-referencing tables using the modelsummary package:
+# https://stackoverflow.com/questions/78829519/r-quarto-table-cross-reference-not-working-when-using-modelsummary
+```
+
+![Effects of Transferring on Player Performance, in Aggregate](Le/saved/causal_plot_baseline.png){#fig-causal-plot-baseline}
+
+@tbl-summary-in-aggregate and @fig-causal-plot-baseline compares the coefficient estimates its associated standard errors, and the corresponding 95% confidence intervals of three models. Models **(1)**, **(2)** and **(3)** represents the multiple linear regression, mixed effects without matching, and mixed effects with matching.
+
+Using the mixed effects model following propensity score matching that we mentioned in the previous slide, on average, a transfer is associated with an approximately 0.025 point decrease in the number of points per game for a player, which is not a large effect. The results also show that the effect is not statistically significant at 95% confidence level.
+
+Comparing this model with simpler models, such as the multiple linear regression without any player- and team-specific random effects, and the mixed effects model without propensity score matching, the only notable difference between the three models is that as the model becomes more complex, the point estimate of the effects of transferring on player performance slightly increased, suggesting that simpler models carry a negative bias. Other than that, the standard errors for the estimates are very similar, and looking at these graphs, all three models actually point to the same conclusion: Transfers do not have a large nor significant impact on performance.
+
+**2. Are the effects of transferring on a player's number of points per game related to whether a player transferred as an overperformer or an underperformer?**
 
 ```{r}
+#| label: tbl-models-matching-summary
+#| tbl-cap: Effects of Transferring and Other Useful Factors on Player Performance, Separated by Overperformers and Underperformers
+
 models_matching_summary
 ```
 
-Comparing the effects of different model specifications:
+![Effects of Transferring on Player Performance, Separated by Overperformers and Underperformers](Le/saved/causal_plot_robust.png){#fig-causal-plot-robust}
 
-```{r}
-compare_causal_plot
-```
+The question is directly motivated by our goal to replicate the recent findings from a prior work by [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15).
 
-\[Note that the `theme_set` command does not save the theme in a `.rds` file.\]
+@tbl-models-matching-summary represents the results of the propensity score matching and mixed effects. In the table, model **(1)** represents the same propensity score matching and mixed effects regression results on the entire dataset. For models **(2)** and **(3)**, we repeated the same modeling steps but changed the definition of the $Transferred$ variable to only include specific types of transfers: transferring as an overperformer in **(2)**, and as an underperformer in **(3)**. @fig-causal-plot-robust represents the results in a more visual format and compares the results of our mixed effects regression following propensity score matching with simpler model specifications like fixed effects models and mixed effects models without regression.
 
-Balance diagnostics (can put these graphs in the Appendix):
+According to @tbl-models-matching-summary and @fig-causal-plot-robust, transferring as an underperformer was associated with a roughly 2 point increase in points per game on average, while transferring as an overperformer was associated with an approximately 1.5 points decrease in points per game on average. In basketball, such changes were very notable to the average points per game as a player and can elevate or diminish a player's presence on the court. The effects were also statistically significant at the 95% confidence level.
 
-```{r}
-match_object_love_plot
-```
+Compared to the mixed effects with matching model, for overperformer and underperformer transfers, the multiple linear regression model was somewhat positively biased and the mixed effects without matching model was slightly negatively biased, if we only counted biases in absolute terms. The standard errors do not vary widely between different models and do not change our conclusion about the differential effects of transferring on player performance if we compare overperformer and underperformer transfers. Looking at the previous section of the results, we can also reasonably conclude that the statistically insignificant and not-so-meaningful magnitude of the change is the result of "averaging out" the effects of overperformers and underperformers together.
 
 ## Discussion
 
