@@ -1,0 +1,291 @@
+#### 0. Data preprocessing
+
+```{r}
+# Clear the environment and read the prepared dataset
+rm(list = ls()) # Clear the environment
+
+library(tidyverse) # For data wrangling
+library(lme4) # For mixed effects models
+library(modelsummary) # Display the results of regression models like in publications
+library(MatchIt) # For propensity score matching models
+library(broom) # For more information on each regression model (not mixed effects)
+library(broom.mixed) # Special broom library for mixed effects models
+
+df <- read.csv("player_stats_hoopR.csv")
+df
+```
+
+```{r}
+# Change necessary variable data types for the models to work properly
+df <- df |>
+  mutate(id = as.factor(id),
+         player = as.factor(player),
+         pos = as.factor(pos),
+         team = as.factor(team),
+         conf = as.factor(conf)) |>
+  
+  # Filter out players who have changed team and skipped the year before
+  # (they are likely to transfer out of DI to lower divisions or JUCOs)
+  filter(!(skipped_year_before == 1 & changed_team == 1)) |>
+  
+  # Filter out for NA values in the dataset
+  drop_na(changed_team, prev_ppg, pos, exp, year, current_barthag, current_barthag_conf,
+          id, team, conf)
+
+  # We don't use data influenced by the pandemic period
+
+df
+```
+
+Generate separate datasets for overperformer and underperformer transfers (changing the definition of the variable `changed_team`):
+
+```{r}
+# Changed the definition of transferred variable: only including underperformer transfers
+df_underperf <- df |>
+  mutate(underperf_transfer = changed_team * is_prev_underperformer) |>
+  select(-changed_team) |>
+  rename(changed_team = underperf_transfer)
+```
+
+```{r}
+# Changed the definition of transferred variable: only including overperformer transfers
+df_overperf <- df |>
+  mutate(overperf_transfer = changed_team * is_prev_overperformer) |>
+  select(-changed_team) |>
+  rename(changed_team = overperf_transfer)
+```
+
+Baseline multiple linear regression model and mixed effects model (note that this chunk will not run automatically):
+
+```{r, eval = FALSE}
+# Note that we do not include team and player fixed effects because of the singleton issue
+# and high runtime associated with creating thousands of binary variables
+
+# Normal conditions:
+linreg_normal <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+               current_barthag + current_barthag_conf,
+             data = df)
+
+no_matching_normal <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                             current_barthag + current_barthag_conf + (1|team:id),
+                           data = df)
+
+# Underperformers dataset:
+linreg_underperf <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                         current_barthag + current_barthag_conf,
+                       data = df_underperf)
+
+no_matching_underperf <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                             current_barthag + current_barthag_conf + (1|team:id),
+                           data = df_underperf)
+
+# Overperformers dataset:
+linreg_overperf <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                        current_barthag + current_barthag_conf,
+                       data = df_overperf)
+
+no_matching_overperf <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                             current_barthag + current_barthag_conf + (1|team:id),
+                           data = df_overperf)
+```
+
+#### 1. Initial modeling
+
+Propensity score matching:
+
+```{r}
+# Functions to automate the propensity score matching workflow without copying and pasting code
+
+propensity_score_matching <- function(my_data, match_ratio = 2) {
+  
+  # my_data: The dataset in question
+
+  # match_ratio: The ratio to match between treatment and control.
+  # This depends on the ratio between transfers and non-transfers for each group.
+  
+  # Function returns the match_object, match_object_data, and mixed_effects_matched for the
+  # dataset. We can consider the result as a "propensity_score_matching" object
+  
+  match_object <- matchit(changed_team ~ pos + exp + current_barthag + current_barthag_conf,
+                          data = my_data, method = "nearest", distance = "glm",
+                          link = "linear.logit", caliper = 0.2, std.caliper = TRUE,
+                          replace = FALSE, ratio = match_ratio)
+
+  match_object_data <- match.data(match_object)
+
+  mixed_effects_matched <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                                  current_barthag + current_barthag_conf + (1|team:id),
+                                data = match_object_data)
+  
+  results <- list("match_object" = match_object, "match_object_data" = match_object_data,
+                  "mixed_effects_matched" = mixed_effects_matched)
+  
+  return(results)
+  
+}
+```
+
+```{r}
+# Implement the function with normal conditions, underperformers, and overperformers
+matching_normal <- propensity_score_matching(df, match_ratio = 2)
+matching_underperf <- propensity_score_matching(df_underperf, match_ratio = 7)
+matching_overperf <- propensity_score_matching(df_overperf, match_ratio = 4)
+```
+
+```{r}
+# Obtain individual objects of each propensity score matching specification
+
+match_object_normal <- matching_normal$match_object
+match_object_underperf <- matching_underperf$match_object
+match_object_overperf <- matching_overperf$match_object
+
+match_object_data_normal <- matching_normal$match_object_data
+match_object_data_underperf <- matching_underperf$match_object_data
+match_object_data_overperf <- matching_overperf$match_object_data
+
+mixed_effects_normal <- matching_normal$mixed_effects_matched
+mixed_effects_underperf <- matching_underperf$mixed_effects_matched
+mixed_effects_overperf <- matching_overperf$mixed_effects_matched
+```
+
+#### 2. Mixed effects model diagnostics
+
+Note that because our sample size is very large (sometimes up to over 10000 observations!), the normality assumption does not matter so much.
+
+```{r}
+# Function to automate the plotting of a mixed effects regression model's diagnostics
+
+# 1. Plotting fitted value versus actual value
+fitted_vs_actual_mixed_effects <- function(model, data) {
+
+  # Retrieve the data to plot model diagnostics plot
+  augmented_dataset <- model |>
+    augment(data)
+  
+  # Return the plot itself
+  result_plot <- augmented_dataset |>
+    ggplot(aes(x = .fitted, y = ppg)) +
+    geom_point(alpha = 0.2) +
+    geom_abline(slope = 1, intercept = 0, color = "red",
+                linetype = "dashed", linewidth = 1.5)
+  
+  return(result_plot)
+  
+}
+```
+
+```{r}
+fitted_vs_actual_mixed_effects(mixed_effects_normal, match_object_data_normal)
+fitted_vs_actual_mixed_effects(mixed_effects_underperf, match_object_data_underperf)
+fitted_vs_actual_mixed_effects(mixed_effects_overperf, match_object_data_overperf)
+```
+
+```{r}
+# Function to automate the plotting of a mixed effects regression model's diagnostics
+
+# 2. Plotting fitted value versus residuals
+fitted_vs_resid_mixed_effects <- function(model, data) {
+
+  # Retrieve the data to plot model diagnostics plot
+  augmented_dataset <- model |>
+    augment(data)
+  
+  # Return the plot itself
+  result_plot <- augmented_dataset |>
+    ggplot(aes(x = .fitted, y = .resid)) +
+    geom_point(alpha = 0.2) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1.5) +
+    geom_smooth()
+  
+  return(result_plot)
+  
+}
+```
+
+```{r}
+fitted_vs_resid_mixed_effects(mixed_effects_normal, match_object_data_normal)
+fitted_vs_resid_mixed_effects(mixed_effects_underperf, match_object_data_underperf)
+fitted_vs_resid_mixed_effects(mixed_effects_overperf, match_object_data_overperf)
+```
+
+#### 3. Propensity score matching model diagnostics
+
+```{r}
+# Load additional libraries for logistic regression diagnostics
+library(regressinator)
+library(DHARMa)
+```
+
+The diagnostics plots are directly used from the CMSACamp lecture. For normal conditions first: Note that the empirical link plot shows a roughly linear correlation when we considered the data as a whole, but not so linear when we only considered the matched data.
+
+```{r}
+# Helper function to create empirical link plots (specified equation)
+empirical_link_plot <- function(dataset, varname) {
+  
+  # Note that varname (variable of interest) should come with quotes
+
+  # Fit a logit model on the data
+  logit_matched_normal <- glm(changed_team ~ pos + exp + current_barthag +
+                                current_barthag_conf,
+                              data = dataset,
+                              family = binomial)
+  
+  # Create data for the empirical link plot (aggregate by quantiles)
+  plot_data_by_variable <- dataset |>
+    bin_by_quantile({{ varname }}, breaks = 20) |>
+    summarize(
+      mean_varname = mean({{ varname }}),
+      prob = mean(changed_team),
+      log_odds = empirical_link(changed_team, family = binomial(link = "logit")),
+      n = n()
+    )
+  
+  plot_data_by_variable |>
+    ggplot(aes(x = mean_varname, y = log_odds)) +
+    geom_point(aes(size = n)) +
+    geom_smooth()
+
+}
+```
+
+```{r}
+empirical_link_plot(df, current_barthag)
+empirical_link_plot(df, current_barthag_conf)
+empirical_link_plot(df_underperf, current_barthag)
+empirical_link_plot(df_underperf, current_barthag_conf)
+empirical_link_plot(df_overperf, current_barthag)
+empirical_link_plot(df_overperf, current_barthag_conf)
+```
+
+Randomized quantile residuals:
+
+```{r}
+# Helper function to create randomized quantile residuals for a dataset (specified equation)
+
+randomized_quantile_residuals <- function(dataset) {
+  
+  # Setting up a logistic regression model with the data
+  logit_model <- glm(changed_team ~ pos + exp + current_barthag + current_barthag_conf,
+                     data = dataset, family = binomial)
+  
+  # Simulate residuals for binary variables and add them to the dataset
+  dh_object <- simulateResiduals(logit_model)
+  
+  augmented_df <- augment(logit_model) |>
+    mutate(.quantile.resid = residuals(dh_object))
+  
+  # Plot the fitted value versus quantile residuals
+  augmented_df |>
+    ggplot(aes(x = .fitted, y = .quantile.resid)) +
+    geom_point(alpha = 0.2) +
+    geom_hline(yintercept = 0.5, color = "red",
+               linetype = "dashed", linewidth = 0.8) +
+    geom_smooth()
+}
+```
+
+```{r}
+randomized_quantile_residuals(df)
+randomized_quantile_residuals(df_underperf)
+randomized_quantile_residuals(df_overperf)
+```
