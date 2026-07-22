@@ -3,4 +3,350 @@ title: "final_eda"
 format: html
 ---
 
+Get data prepped
 
+```{r}
+if (!require("pak")) install.packages("pak")
+pak::pak("andreweatherman/cbbplotR")
+
+library(cbbplotR)
+library(hoopR)
+library(tidyverse)
+library(patchwork)
+
+df_2022 <- torvik_player_stats(year = 2022)
+df_2023 <- torvik_player_stats(year = 2023)
+df_2024 <- torvik_player_stats(year = 2024)
+df_2025 <- torvik_player_stats(year = 2025)
+df_2026 <- torvik_player_stats(year = 2026)
+
+eda_df <- bind_rows(df_2022, df_2023, df_2024, df_2025, df_2026)
+
+
+
+#add changed team
+eda_df <- eda_df |>
+  arrange(player_id, year) |>
+  group_by(player_id) |>
+  mutate(prev_team = lag(team),
+         prev_year = lag(year),
+         #if they have a previous team AND 
+         #the year is the one right after the previous year AND 
+         #the team they're on is not the same as the previous team THEN
+         #changed_team is through IF NOT THEN
+         #changed_team is false 
+         changed_team = ifelse(!is.na(prev_team) &
+                                 year == (prev_year + 1) &
+                                 team != prev_team,
+                               TRUE,
+                               FALSE)) |>
+  ungroup()
+
+set_theme(theme_bw())
+```
+
+Conference EDA
+
+```{r}
+# # conference outs
+# 
+# eda_df <- eda_df |>
+#   mutate(conference_classification = case_when(
+#     conf %in% c("B10", "SEC", "ACC", "B12", "BE") ~ "high-major",
+#     conf %in% c("Amer", "A10", "CAA", "MVC", "MWC", "P12", "WCC") ~ "mid-major",
+#     conf %in% c("AE", "ASun", "BSky", "BSth", "BW", "CUSA", "Horz",
+#               "Ivy", "MAAC", "MAC", "MEAC", "NEC", "OVC", "Pat",
+#               "SC", "Slnd", "SWAC", "Sum", "SB", "WAC", "ind") ~ "low-major"
+#   ))
+# 
+# eda_df <- eda_df |>
+#   mutate(prev_conf = lag(conf))
+# 
+# eda_df <- eda_df |>
+#   mutate(prev_conf_class = lag(conference_classification))
+# 
+# 
+# master_conference_order <- eda_df |>
+#   filter((changed_team == TRUE) & (prev_conf != conf)) |>
+#   count(prev_conf, sort = TRUE) |>
+#   pull(prev_conf)
+# 
+# transfers_out <- eda_df |>
+#   filter((changed_team == TRUE) & (prev_conf != conf)) |>
+#   ggplot(aes(x = fct_relevel(prev_conf, rev(master_conference_order)), 
+#              fill = prev_conf_class)) +
+#   geom_bar() +
+#   geom_cbb_conferences(
+#   mapping = NULL,
+#   data = NULL,
+#   stat = "identity",
+#   position = "identity",
+#   na.rm = FALSE,
+#   show.legend = FALSE,
+#   inherit.aes = TRUE,
+#   logo_type = "normal",
+#   highlight_conferences = NULL,
+#   highlight_method = "alpha",
+#   highlight_alpha = 0.5
+# ) +
+#   coord_flip() +
+#   scale_y_reverse() +
+#   scale_fill_manual(values = c("high-major" = "darkgreen", 
+#                                "mid-major"  = "goldenrod", 
+#                                "low-major"  = "red"),
+#                     breaks = c("high-major", "mid-major", "low-major") ) +
+#   theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+#         axis.title.y =  element_text(size = 12, vjust = -1.5, face = "bold"),
+#         legend.position = "none",
+#         plot.caption = element_text(size = 9, vjust = -2.5),
+#         axis.text.x = element_text(size = 11),
+#         legend.text = element_text(size = 12)) +
+#   labs(y = "Number of Transfers Out",
+#        x = "Conference\n")
+# #ACC has the most transfers outs
+# 
+# #transfers_out
+# 
+# # transfers in
+# transfers_in <- eda_df |>
+#   filter((changed_team == TRUE) & (prev_conf != conf)) |>
+#   ggplot(aes(x = fct_relevel(conf, rev(master_conference_order)), 
+#              fill = conference_classification)) +
+#   geom_bar() +
+#   coord_flip() +
+#   scale_fill_manual(values = c("high-major" = "darkgreen", 
+#                                "mid-major"  = "goldenrod", 
+#                                "low-major"  = "red"), breaks = c("high-major", "mid-major", "low-major") ) +
+#   theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+#         axis.text.y = element_blank(),
+#         axis.title.y = element_blank(),
+#         legend.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+#         plot.caption = element_text(size = 9, vjust = -2.5),
+#         axis.text.x = element_text(size = 11),
+#         legend.text = element_text(size = 12)) +
+#   labs(y = "Number of Transfers In",
+#        fill = "Conference Classification") 
+# # SEC has most transfers in 
+# 
+# 
+# 
+# transfers_out + transfers_in + theme(plot.margin = margin(0, 0, 0, 0, "pt"))
+
+```
+
+Position EDA
+
+```{r}
+
+ unique(eda_df$role)
+ eda_df<- eda_df |>
+   mutate(role = case_when(
+     role %in% c("Wing F", "Stretch 4", "PF/C") ~ "forward",
+     role == "C" ~ "center",
+     role %in% c("Combo G", "Scoring PG", "Wing G", "Pure PG") ~ "guard",
+     .default = role
+   ))
+ 
+# unique(eda_df$role)
+```
+
+```{r}
+position_numbers <- eda_df |>
+  filter(changed_team == TRUE) |>
+  ggplot(aes(x = role, fill = role)) +
+  geom_bar() +
+  geom_text(
+    stat = "count", 
+    aes(label = after_stat(count)), 
+    vjust = -0.5, 
+    size = 4.5,
+    fontface = "bold"
+  ) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) + 
+  scale_fill_manual(values = c("guard" = "darkgreen", 
+                               "center"  = "blue", 
+                               "forward"  = "red")) +
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y =  element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11),
+        legend.text = element_text(size = 12)
+        ) +
+  labs(
+    y = "Number of Transfers\n",
+    x = "Position",
+    fill = "Position"
+  )
+  ggsave("position_numbers.png", plot = position_numbers)
+```
+
+Experience EDA
+
+```{r}
+eda_df <- eda_df |>
+  mutate(prev_class = lag(class))|>
+  filter((class == "Fr") | (class == "So" & prev_class == "Fr") | (class == "Jr" & prev_class == "So") | (class == "Sr" & prev_class == "Jr") | (class == "Sr" & prev_class == "Sr"))
+
+eda_df <- eda_df |>
+  mutate(class = ifelse((class == "Sr" & prev_class == "Sr"), "SSr", class))
+
+
+class_numbers <- eda_df |>
+  filter(changed_team == TRUE & class != "Fr") |>
+#         & is.na(class) == FALSE & is.na(prev_class) == FALSE & class != "" & class != "Fr") 
+  mutate(class = factor(class, levels = c("So", "Jr", "Sr", "SSr"))) |>
+  ggplot(aes(x = class, fill = class)) +
+  geom_bar() +
+  geom_text(
+    stat = "count", 
+    aes(label = after_stat(count)), 
+    vjust = -0.5, 
+    size = 4.5,
+    fontface = "bold"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) + 
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y =  element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11),
+        legend.text = element_text(size = 12)
+        ) +
+  labs(
+    x = "Class Level",
+    y = "Number of Transfer Players\n",
+    fill = "Class Level",
+    caption = "\n*SSr notation is short for Super Senior, or a player in their 5th or 6th season"
+  ) +
+  scale_fill_manual(values = c("So" = "darkgreen", 
+                               "Jr"  = "goldenrod", 
+                               "Sr"  = "red", 
+                     "SSr" = "blue"))
+
+ggsave("class_numbers_2.png", plot = class_numbers)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(patchwork) # For combining plots with +
+library(cbbplotR)
+
+# 1. PRE-COUNT TRANSFERS OUT
+df_out <- eda_df |>
+  filter(changed_team == TRUE & prev_conf != conf) |>
+  group_by(prev_conf, prev_conf_class) |>
+  summarise(freq = n(), .groups = "drop")
+
+transfers_out <- df_out |>
+  ggplot(aes(x = fct_relevel(prev_conf, rev(master_conference_order)), 
+             y = freq,              # Added y
+             conference = prev_conf, # Added conference aesthetic for logos
+             fill = prev_conf_class)) +
+  geom_col() + # Changed from geom_bar to geom_col
+  geom_cbb_conferences(
+    logo_type = "normal",
+    show.legend = FALSE,
+    highlight_alpha = 0.5,
+    width = .10,
+    hjust = 1.5
+  ) +
+  coord_flip() +
+  scale_y_reverse(limits = c(260, 0)) + 
+  scale_fill_manual(values = c("high-major" = "darkgreen", 
+                               "mid-major"  = "goldenrod", 
+                               "low-major"  = "red"),
+                    breaks = c("high-major", "mid-major", "low-major") ) +
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y =  element_text(size = 12, vjust = -1.5, face = "bold"),
+        legend.position = "none",
+        plot.caption = element_text(size = 9, vjust = -2.5),
+        axis.text.x = element_text(size = 11),
+        legend.text = element_text(size = 12)) +
+  labs(y = "Number of Transfers Out", x = "Conference\n")
+
+
+# 2. PRE-COUNT TRANSFERS IN
+df_in <- eda_df |>
+  filter(changed_team == TRUE & prev_conf != conf) |>
+  group_by(conf, conference_classification) |>
+  summarise(freq = n(), .groups = "drop")
+
+transfers_in <- df_in |>
+  ggplot(aes(x = fct_relevel(conf, rev(master_conference_order)), 
+             y = freq, # Added y
+             fill = conference_classification)) +
+  geom_col() + # Changed from geom_bar to geom_col
+  coord_flip() +
+  scale_fill_manual(values = c("high-major" = "darkgreen", 
+                               "mid-major"  = "goldenrod", 
+                               "low-major"  = "red"), 
+                    breaks = c("high-major", "mid-major", "low-major") ) +
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        legend.title = element_text(size = 12, hjust = 0.5, face = "bold"),
+        plot.caption = element_text(size = 9, vjust = -2.5),
+        axis.text.x = element_text(size = 11),
+        legend.text = element_text(size = 12)) +
+  labs(y = "Number of Transfers In", fill = "Conference Classification") 
+
+# 3. COMBINE PLOTS
+transfers_out + transfers_in + theme(plot.margin = margin(0, 0, 0, 0, "pt"))
+
+```
+
+Team EDA
+
+```{r}
+
+eda_df |>
+  filter(changed_team == TRUE) |>
+  group_by(prev_team, year) |>
+  summarise(freq = n(), .groups = "drop") |>
+  slice_max(n = 4, order_by = freq) |>
+  mutate(team_year = paste(prev_team, year)) |> 
+  ggplot(aes(x = reorder(team_year, freq),  y = freq, fill = prev_team)) +
+  geom_col() +
+  geom_text(aes(label = freq), hjust = -0.2, size = 4) + 
+  coord_flip() +
+  scale_x_discrete(expand = expansion(mult = c(0.05, 0.15))) + 
+  scale_fill_cbb_teams(
+    type = c("primary", "secondary"),
+    values = NULL,
+    aesthetics = "fill",
+    breaks = ggplot2::waiver(),
+    na.value = "grey50",
+    guide = NULL,
+    alpha = NA
+  ) +
+  labs(x = "Team and Year",
+       y = "Number of Transfers Out") +
+  theme(axis.title.x = element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.title.y =  element_text(size = 12, vjust = -1.5, face = "bold"),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11),
+        legend.text = element_text(size = 12)
+        ) +
+  scale_y_continuous(by = 2)
+
+
+eda_df |>
+  filter(changed_team == TRUE) |>
+  group_by(prev_team, year) |>
+  summarise(freq = n(), .groups = "drop") |>
+  slice_max(n = 4, order_by = freq) |>
+  ggplot(aes(x = reorder(prev_team, freq),  y = freq, fill = prev_team)) +
+  geom_col() +
+  geom_text(aes(label = freq), hjust = -0.2, size = 4) + 
+  coord_flip() +
+  scale_fill_cbb_teams(
+  type = c("primary", "secondary"),
+  values = NULL,
+  aesthetics = "fill",
+  breaks = ggplot2::waiver(),
+  na.value = "grey50",
+  guide = NULL,
+  alpha = NA
+)
+```

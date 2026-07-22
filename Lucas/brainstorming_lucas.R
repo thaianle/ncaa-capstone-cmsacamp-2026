@@ -731,26 +731,24 @@ position_df |>
 set.seed(1234)
 
 data_table <- df |>
-  select(year, id, changed_team, mpg, prev_mpg, ppg, prev_ppg, has_transferred, cumulative_career_transfers) |>
+  select(id, year, team, pos, exp, changed_team, ppg) |>
   slice_sample(n = 5) |>
   gt() |>
   cols_label(
     year = "Year",
     id = "Player ID",
     changed_team = "Year After Transfer",
-    mpg = "Minutes Per Game",
-    prev_mpg = "Previous Year's Minutes Per Game",
     ppg = "Points Per Game",
-    prev_ppg = "Previous Year's Points Per Game",
-    has_transferred = "Has Transferred",
-    cumulative_career_transfers = "Cumulative Career Transfers"
+    team = "Team",
+    pos = "Position",
+    exp = "Experience"
   ) |>
   fmt_number(
-    columns = c(mpg, prev_mpg, ppg, prev_ppg),
+    columns = ppg,
     decimals = 2
   )
 
-gtsave("data_table_correct.png", data = data_table)
+gtsave("data_table_correct_2.png", data = data_table)
 
 df |>
   filter(pos == "PF/C")
