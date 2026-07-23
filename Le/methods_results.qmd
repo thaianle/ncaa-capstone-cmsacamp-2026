@@ -152,9 +152,9 @@ Cole, K., Pearman, F., & Khanna, S. (2026). Big Fish or Little Pond? National Ev
 
 Gilani, S. (2026). *hoopR: Access Men's Basketball Play by Play Data*. (Version 3.1.0) \[Computer software\]. <https://github.com/sportsdataverse/hoopR>
 
-Gonzalez Sanchez, A., Martinez, S., Yurko, R., Elmore, R., & Macdonald, B. (2024). Beyond the Box Score: Does Icing the Field Goal Kicker Work in the NFL? *CHANCE, 37*(3), 41–48. <https://doi.org/10.1080/09332480.2024.2415841>
-
 Ho, D., Imai, K., King, G., Stuart, E. (2011). MatchIt: Nonparametric Preprocessing for Parametric Causal Inference. *Journal of Statistical Software, 42*(8), 1-28. <https://doi.org/10.18637/jss.v042.i08>.
+
+Ward, P. (2025, April 1). *Crossed vs Nested Random Effects*. Optimum Sports Performance. Retrieved July 23, 2026, from <https://optimumsportsperformance.com/blog/crossed-vs-nested-random-effects/>
 
 ## Acknowledgments
 
@@ -190,36 +190,52 @@ Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference,
 | $ConfRating$ | sample text | sample text |
 | $Conference$ | sample text | sample text |
 
-## Appendix 2: Main regression model selection process \[IN PROGRESS\] {#appendix-2}
-
-Before deciding on the exact model specification for our project, we tested several different regression models commonly used for causal inference. One of the questions that we considered were about whether we should choose a fixed effects model or mixed or random effects models (note the difference in the first letter!).
+## Appendix 2: Model selection process for mixed effects regression {#appendix-2}
 
 ```{r}
 models_fe_summary <- readRDS("saved/models_fe_summary.rds")
 models_mixed_summary <- readRDS("saved/models_mixed_summary.rds")
 ```
 
-First, we used fixed effects regression models only to further understand the general trends on transferring and the player's natural development on player performance, using the following equations:
-
-**(Insert equation for models 1, 2, and 3. Need to change the appearance of the model summaries.)**
+As part of our initial modeling process, we experimented with both fixed effects and mixed effects regression models using different sets of covariates, and the results are reported in this appendix. These results were useful for us to decide the exact specifications for our main regression model to identify the estimated effect of transferring on a player's points per game.
 
 ```{r}
+#| label: tbl-models-fe-summary
+#| tbl-cap: Results of Different Fixed Effects Models with Points Per Game (PPG) as the Outcome Variable
+
 models_fe_summary
 ```
 
-Model **(1)** in Table X represents the effects of the player's natural development on player performance, model **(2)** measures the effect of transfers without any additional controls, and model **(3)** is the multiple linear regression model after taking many factors into consideration. Unsurprisingly, player's development and their own athletic ability decides a great deal on the player performance in the current year, with an adjusted R<sup>2</sup> of over 0.4, whereas the model with the transfer decisions alone only had an adjusted R<sup>2</sup> of 0.01. The effects also fit a great deal with our EDA figures above.
+First, we used fixed effects regression models to get a general overview of the effects of transfers and the player's natural development (colloquially called the "age curve") on player performance. @tbl-models-fe-summary shows the point estimates of important coefficients, along with the standard errors, of the following fixed effects models:
 
-Next, we tested the mixed effects models to understand which mixed effects to include in our final regression model, using the following equations:
+$$
+\widehat{\text{PPG}_{t}} = \beta_0 + \beta_1 \text{PPG}_{t-1} \tag{1}
+$$
+$$
+\widehat{\text{PPG}_{i}} = \beta_0 + \beta_1 \text{Transferred}_{i} \tag{2}
+$$
+$$
+\widehat{\text{PPG}_{ijkt}} = \beta_0 + \beta_1 \text{Transferred}_{ij} + \beta_2 t + \beta_3 \text{PPG}_{i,t-1} + \beta_4 \text{Position}_{i} +\\ \beta_5 \text{Experience}_{it} + \beta_6 \text{Conference}_{kt} + \beta_7 \text{TeamRating}_{jt} + \beta_8 \text{ConfRating}_{kt} \tag{3}
+$$
 
-**(Insert equation for models 1, 2, and 3. Need to change the appearance of the model summaries.)**
+The results in models **(1)** and **(2)** in @tbl-models-fe-summary replicates the findings of the Exploratory Data Analysis section: both points per game in previous season and being an incoming transfer is positively correlated with player performance, as evidenced in the positive and considerable effect sizes. Unsurprisingly, the adjusted R<sup>2</sup> of model **(1)** (= 0.419) is higher than that of model **(2)** (= 0.010), suggesting that without any additional control variables, a player's points per game in their previous season in NCAA Division I men's basketball is much more predictive than whether they are an incoming transfer or not. Model **(3)** in the same table illustrates that the estimated effects of transferring on player performance can widely vary by including control variables, and thus a simple linear regression model would introduce a considerable amount of bias into our estimates.
+
+Next, we compared the results of different mixed effects regression models, with a goal of determining which model is more valid to estimate the effect of transferring on player performance.
 
 ```{r}
+#| label: tbl-models-mixed-summary
+#| tbl-cap: Results of Different Mixed Effects Models with Different Random Effects Specifications
+
 models_mixed_summary
 ```
 
-The fixed effects parts in all three models in the above table are similar to the model **(3)** of the previous figure, which we represented in matrix form. We tested three types of mixed effects: crossed (model **(1)**), nested (model **(2)**), and partially crossed and nested (model **(3)**) in the table. We hypothesized that the partially crossed and nested effects would be the most useful model for player transfers, because taking inspiration from the example from a blog post by Ward (2025), a player can play for multiple teams in their college career, but no player can play for all hundreds of teams in the NCAA.
+@tbl-models-mixed-summary displays the coefficient estimates of the $Transferred$ variable and standard deviation of within-group variations for teams, players, and the team-player interactions. All three models in the table contains similar fixed effects, such as position, experience level, and conference; and their only differences are in the random effects. To avoid fitting computationally expensive models on our dataset with thousands of observations, we only considered random intercepts in this case.
 
-In fact, when we fit multiple mixed effects models, we can see that different specifications of the mixed effects models do not drastically change the point estimates nor the standard errors. The notable thing are the standard deviations for different types of mixed effects models. In particular, the standard deviation for team and player alone is nearly indistinguishable from zero, while the standard deviation for team \* player interaction is notably different from zero. We suspect that this is not only because different players and teams have different baseline levels of performance, but also because using domain knowledge, a player's performance is heavily dependent on the team's performance as a whole, and vice versa.
+In @tbl-models-mixed-summary, model **(1)** specifies crossed random effects for players and teams (lme4 syntax: `1|team + 1|id`), model **(2)** specifies nested random effects (`1|team/id`), and model **(3)** specifies a partially crossed and nested random effects (`1|team + 1|id + 1|team:id`). We hypothesized that the partially crossed and nested random effects model would capture the most random variations between players' and teams' baseline performance. This hypothesis was justified by a clearly illustrated example from [Ward (2025)](https://optimumsportsperformance.com/blog/crossed-vs-nested-random-effects/): an athlete can play for more than one team, but one single athlete can never play for all teams specified in the dataset.
+
+The only remarkable differences between the results of three models outlined in @tbl-models-mixed-summary concern the standard deviations corresponding to within-player, within-team, and within-player-and-team variations. The within-player and within-team variations on their own was approximately zero for our data, but the standard deviation for the interacted variation across all player-team combination as shown in model **(3)** was notable.
+
+As a final validation, we determined if adding the random intercepts for player-team interaction (`1|team:id`) to extend model **(3)** of @tbl-models-fe-summary (the most complex regression model that only included fixed effects) is actually necessary. Results from the likelihood ratio test (LRT) strongly supports the decision to factor an interacted random intercept for each player and team combination ($\chi^2 = 308.42, p < 0.001$).
 
 ## Appendix 3: Visual diagnostics of the models {#appendix-3}
 
