@@ -43,15 +43,9 @@ Transferring has a huge impact on coaches, players, and programs as a whole. It 
 
 ## Data
 
-When it comes to the data used in our research, we used multiple sources. All of these sources are structured similarly; each observation is a player's season and their metrics for that season. The data sources we used were:
+When it comes to the data used in our research, we used the `hoopR` R package part of the **SportsDataverse** ecosystem. Within this dataset, each observation is a player's season and their metrics for that season. This datasource is also publically available, making our code (link found under Contact Information and Code Availability section) entirely reproducible. 
 
--   `cbbdata` R package developed by Andrew Weatherman
-
--   `hoopR` R package part of the **SportsDataverse** ecosystem
-
--   Proprietary data provided by the University of Pittsburgh Athletics Department
-
-![](images/clipboard-3586035713.png){fig-align="center"}
+![](hoopR logo.png){fig-align="center" width="186"}
 
 A simplified example of what the overall structures of these datasets look like:
 
@@ -86,17 +80,13 @@ So, columns indicating a if the player is a transfer for a certain year, if they
 
 ## Exploratory Data Analysis
 
-#### EDA 1: If a player is already performing well, they should not transfer
+### EDA 1: If a player is already performing well, they should not transfer
 
 ![](side_by_side.png)
 
 \[Note that the `side_by_side_correct_3.png` does not work for everyone because this image has not been pushed to the project repo\]
 
 Aspects of this graph:
-
--   X-axis is a transfer player's metric the year before their transfer
-
--   Y-axis is a transfer player's metric the year after their transfer
 
 -   Line y = x is the "line of equal return"
 
@@ -106,7 +96,7 @@ Aspects of this graph:
 
 On both plots, the trend line starts above y = x, but then intersects the line of equal return, and remains under that line for the rest of the plot. This shows that if a players points per game/minutes per game (PPG/MPG) the previous year is below the PPG/MPG at the point of intersection, the average player will have a higher PPG/MPG after their transfer than before their transfer. Reversely, if a player has a higher PPG/MPG in their previous year than the point of intersection, then the average player will have a lower PPG/MPG after their transfer than before their transfer. More simply, the better a player is, the harder it will be to match or surpass their previous PPG/MPG after a transfer. So, if a player is playing well, it is not advised to transfer.
 
-#### EDA 2: Average points per game generally improves over players’ careers, but transfers typically outperform non-transfers
+### EDA 2: Average points per game generally improves over players’ careers, but transfers typically outperform non-transfers
 
 ![](Le/checkpoint_1/cp1_age_curves.png)
 
@@ -119,6 +109,23 @@ Aspects of this graph:
 -   Color is the transfer status of the players in each category
 
 From this, the pattern trend is that each line, for the most part, increases year over year. This accurately reflects the phenomenon where many players within the NCAA improve their performance when they gain more experience. This is similar to the relationship between performance and age in the NBA. However, age curves in the NBA display a peak at a certain age. In the NCAA, performance increases with experience, as most players hit a peak later in their career after their time in collegiate athletics. Another major trend in the graph is the never transferred (purple) line's separation from the lines that indicate a player has transferred or will transfer at least once. This inspired deep analysis on the difference in metrics between non-transfers and transfer athletes.
+
+### EDA supporting the Methodology
+
+##### Positions with the most transfers
+
+![](position_numbers.png){fig-align="left" width="541"}
+This figure helps to guage what position in basketball is transferring the most often. It shows us that players who play guard transfer the most often. While it is not known as to why that is the case, but finding the underlying trends in the type of players that make up the players in the portal is very important in our research.
+
+##### Experience/Class Level with the most transfers
+
+![](class_numbers_2.png){width="549"}
+Similarly to the position graph, this bar chart informs on when players are transferring in their career. It is most common for players to transfer from their junior to senior year, making the year after the transfer occurs, or the first season at a new school, a player's senior year. Again, it is not known why this is, but knowing this information helps to analyze the patterns on transfer players as a whole.
+
+##### Conferences with the most transfers in and out
+
+![](in_and_out.png){width="592"}
+This chart displays which conferences have the most transfers in and the most transfers out. Sorted from transfers out highest to lowest, we can see how players are moving between conferences. A major insight that this displays is that many of the conferences with the most movement of transfer players are categorized as high and mid-major. This may be correlated with funding and the NIL money, as players are moving to where they gain the most financial incentive.
 
 ## Methods
 
@@ -197,7 +204,7 @@ models_matching_summary
 
 Comparing the effects of different model specifications:
 
-```{r}
+```{r, eval=F}
 compare_causal_plot
 ```
 
@@ -205,7 +212,7 @@ compare_causal_plot
 
 Balance diagnostics (can put these graphs in the Appendix):
 
-```{r}
+```{r, eval=F}
 match_object_love_plot
 ```
 
@@ -214,6 +221,14 @@ match_object_love_plot
 ### 1. Implications of the results
 
 \[Add some connection between results and domain knowledge\]
+
+This research provides multiple understandings on the relationship between a transferring and a player's athletic performance. When analyzing this relationship on all transfer athletes, an insignificant affect on a player's points per game after transferring was found in all 3 models. However, when it comes to grouping players into overperformers and underperformers based on their performance relative their teammates, the significant results lie in this distinction.
+
+Firstly, the results of this study impact players in NCAA Division I Men's Basketball. A player, before transferring, may want to look into their performance relative to their team, and assess their status as either an underperformer or overperformer within their respective program. From here, underperformers will find more success transferring to a smaller or lesser ranked program, effectively scoring around 2 more points per game compared to a similar player that does not transfer. Reversely, as an overperformer at their current program, upon transferring, players experience a 1.5 point per game drop compared to players that do not transfer between years. So, overperformers may want to rethink the decision of transferring before fully committing to a different school.
+
+From a coach's perspective, a similar framework can be applied on finding players from the portal to invest in. The more successful players after a transfer occurs, will come from underperformers at a higher ranked school. For example, a coach may attempt to find a replacement for a player already on the roster. If a replacement player comes from an underperforming background at a bigger program and has a similar propensity score to a player already on the roster, that replacement player would be projected to score 2 more points per game than the existing player. Conversely, it is expected that a transfer player coming as an overperformer at a smaller program will obtain around 1.5 points per game less than a similar player who stays. So, while scouting up and coming talent from lesser teams can give that player a new atmosphere, that choice in player might not always result in an improved performance.
+
+A major takeaway from these findings is the importance of finding a competition level where the player can maximize their potential. Different conferences within the NCAA are like their own miniature leagues with their own competition level. This gives players the unique ability to find the niche environment to perform their best. Furthermore, transferring gives players the ability to do exactly this. Of course, with the always-changing makeup of the modern NCAA, the need for further analysis persists.
 
 ### 2. Limitations and next steps
 
