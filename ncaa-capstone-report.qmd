@@ -113,9 +113,7 @@ On both plots, the trend line starts above y = x, but then intersects the line o
 
 Aspects of this graph:
 
--   X-axis is the category of experience or eligibility in the NCAA
-
--   Y-axis is a the average points per game for the category
+-   Error bars include the 95% confidence interval
 
 -   Color is the transfer status of the players in each category
 
