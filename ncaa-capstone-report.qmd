@@ -162,9 +162,9 @@ $$
 
 The coefficient $\beta_1$ for the $\text{Transferred}$ variable would give the magnitude of the effect of transferring on a player's points per game in the current year, while the standard error associated with that coefficient would determine the statistical significance of our estimates.
 
-## Results \[IN PROGRESS\]
+## Results
 
-**1. In aggregate, what is the effects of transferring on the number of points per game that a player gets in an NCAA basketball season?**
+**a) In aggregate, what is the effects of transferring on the number of points per game that a player gets in an NCAA basketball season?**
 
 ```{r}
 models_matching_summary <- readRDS("Le/saved/models_matching_summary.rds")
@@ -172,6 +172,10 @@ compare_causal_plot <- readRDS("Le/saved/compare_causal_plot.rds")
 match_object_love_plot <- readRDS("Le/saved/match_object_love_plot.rds")
 summary_in_aggregate <- readRDS("Le/saved/summary_in_aggregate.rds")
 ```
+
+![Effects of Transferring on Player Performance, in Aggregate](Le/saved/causal_plot_baseline.png){#fig-causal-plot-baseline width="70%"}
+
+@fig-causal-plot-baseline shows the point estimates for the coefficient associated with the $Transferred$ variable using different regression models, along with the 95% confidence intervals in a visual form. For the mixed effects model following propensity score matching as outlined in the [Methods](#methods) section, on average, a transfer is associated with a 0.025 point decrease in the number of points per game for a college basketball player. The 95% confidence interval for the estimate contained $0$, which implies that the effect of a transfer on player performance is not statistically significant.
 
 ```{r}
 #| label: tbl-summary-in-aggregate
@@ -183,48 +187,52 @@ summary_in_aggregate
 # https://stackoverflow.com/questions/78829519/r-quarto-table-cross-reference-not-working-when-using-modelsummary
 ```
 
-![Effects of Transferring on Player Performance, in Aggregate](Le/saved/causal_plot_baseline.png){#fig-causal-plot-baseline}
+@tbl-summary-in-aggregate summarizes the results of the three regression models used in @fig-causal-plot-baseline in greater detail. In the table, models **(1)**, **(2)**, and **(3)** represents the multiple linear regression model (which only includes the fixed effects), mixed effects models without and with propensity score matching, in their respective order. We found that simpler models show a slightly negative bias in estimating the effect of a transfer compared to more complex models. However, the standard errors did not widely vary across the models, and given the magnitude and standard errors of the models' estimates, all three models gave the same conclusion that transfers, in aggregate, do not have a large nor significant impact on performance.
 
-@tbl-summary-in-aggregate and @fig-causal-plot-baseline compares the coefficient estimates its associated standard errors, and the corresponding 95% confidence intervals of three models. Models **(1)**, **(2)** and **(3)** represents the multiple linear regression, mixed effects without matching, and mixed effects with matching.
+**b) Are the effects of transferring on a player's number of points per game related to whether a player transferred as an overperformer or an underperformer?**
 
-Using the mixed effects model following propensity score matching that we mentioned in the previous slide, on average, a transfer is associated with an approximately 0.025 point decrease in the number of points per game for a player, which is not a large effect. The results also show that the effect is not statistically significant at 95% confidence level.
+The question is directly motivated by our goal to replicate the recent findings from a prior work by [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15). As mentioned in the [Methods](#methods) section, we defined overperformers as among the "top 50%" of players in a team and underperformers as among the remaining "bottom 50%", using the median points per game across all players in the same team as the threshold.
 
-Comparing this model with simpler models, such as the multiple linear regression without any player- and team-specific random effects, and the mixed effects model without propensity score matching, the only notable difference between the three models is that as the model becomes more complex, the point estimate of the effects of transferring on player performance slightly increased, suggesting that simpler models carry a negative bias. Other than that, the standard errors for the estimates are very similar, and looking at these graphs, all three models actually point to the same conclusion: Transfers do not have a large nor significant impact on performance.
-
-**2. Are the effects of transferring on a player's number of points per game related to whether a player transferred as an overperformer or an underperformer?**
+We repeated the modeling steps as outlined in the [Methods](#methods) section, comparing the results of the mixed effects model followed by propensity score matching when we changed the definition of the treatment group to only include players who transferred as underperformers and as overperformers in the previous season. The results are represented in tabular form with @tbl-models-matching-summary. Here, models **(1)**, **(2)**, and **(3)** denote mixed effects models with matching when we considered transfers on aggregate, underperformer transfers only, and overperformer transfers only, in their respective order.
 
 ```{r}
 #| label: tbl-models-matching-summary
-#| tbl-cap: Effects of Transferring and Other Useful Factors on Player Performance, Separated by Overperformers and Underperformers
+#| tbl-cap: Effects of Transferring and Other Useful Factors on Player Performance, Estimated by Mixed Effects with Matching Model
 
 models_matching_summary
 ```
 
-![Effects of Transferring on Player Performance, Separated by Overperformers and Underperformers](Le/saved/causal_plot_robust.png){#fig-causal-plot-robust}
+According to @tbl-models-matching-summary, on average, transferring as an underperformer is associated with an approximately 1.98 point increase in the athlete's points per game, while transferring as an overperformer is associated with an approximately 1.46 point decrease in the athlete's points per game. The effects of underperformer and overperformer transfers shown in the table are also statistically significant $(p < 0.001)$. For most college basketball athletes, these changes in points per game are meaningful and correspond well with a notable change in an athlete's presence and contribution on the court. The magnitude and significance of our estimates also validated the prior finding by [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15).
 
-The question is directly motivated by our goal to replicate the recent findings from a prior work by [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15).
+![Effects of Transferring on Player Performance, Separated by Definition of the "Transferred" Treatment Group](Le/saved/causal_plot_robust.png){#fig-causal-plot-robust}
 
-@tbl-models-matching-summary represents the results of the propensity score matching and mixed effects. In the table, model **(1)** represents the same propensity score matching and mixed effects regression results on the entire dataset. For models **(2)** and **(3)**, we repeated the same modeling steps but changed the definition of the $Transferred$ variable to only include specific types of transfers: transferring as an overperformer in **(2)**, and as an underperformer in **(3)**. @fig-causal-plot-robust represents the results in a more visual format and compares the results of our mixed effects regression following propensity score matching with simpler model specifications like fixed effects models and mixed effects models without regression.
+Using the same approach to analyzing the effects of transferring on an athlete's points per game in aggregate, we also compared our estimates using the mixed effects model following propensity score matching with less complex models. The results are represented in visual form with @fig-causal-plot-robust.
 
-According to @tbl-models-matching-summary and @fig-causal-plot-robust, transferring as an underperformer was associated with a roughly 2 point increase in points per game on average, while transferring as an overperformer was associated with an approximately 1.5 points decrease in points per game on average. In basketball, such changes were very notable to the average points per game as a player and can elevate or diminish a player's presence on the court. The effects were also statistically significant at the 95% confidence level.
-
-Compared to the mixed effects with matching model, for overperformer and underperformer transfers, the multiple linear regression model was somewhat positively biased and the mixed effects without matching model was slightly negatively biased, if we only counted biases in absolute terms. The standard errors do not vary widely between different models and do not change our conclusion about the differential effects of transferring on player performance if we compare overperformer and underperformer transfers. Looking at the previous section of the results, we can also reasonably conclude that the statistically insignificant and not-so-meaningful magnitude of the change is the result of "averaging out" the effects of overperformers and underperformers together.
+Compared to our mixed effects model with propensity score matching, the multiple linear regression model overestimated the magnitude of the effect of transferring on player performance, and the mixed effects without matching model underestimated the magnitude. Nevertheless, the direction of the effect, the point estimates, and the standard errors did not widely vary between the three models. Therefore, we have a reason to conclude that all three models still gave the same conclusion even when we only included overperformer transfers or underperformer transfers in the treatment group, and that the small and statistically insignificant effect of transferring on player performance in aggregate might be the result of "averaging out" the effects of underperformer and overperformer.
 
 ## Discussion
 
-### 1. Implications of the results
+### 1. Implications and practical recommendations
 
 \[Add some connection between results and domain knowledge\]
 
 ### 2. Limitations and next steps
 
--   Weirdness in eligibility data (changes in eligibility rules, redshirting, one-and-done, transferring involving outside DI institutions, etc.)
+**a) Data constraints**
 
--   Transfers for non-athletic-related reasons (eg: academic or proximity to home, NIL, injury, coaching changes) -\> More data collection is needed
+Similar to the discussions by [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15), our data source did not provide an entirely clear way to understand certain players' transfer histories only via data wrangling. In addition, it did not contain many confounding variables that affected both a player's decision to transfer and their athletic performance, which could lead to omitted variable biases when specifying our regression models.
 
--   Points per game might not be an accurate indicator of performance -\> use publicly available datasets for points per possession, RAPM, etc.
+First, we found that although our data source offered information on players and their team in their respective seasons, transfers in the data for NCAA Division I player statistics are not entirely straightforward comparisons between a player's team in the current year and in the previous year. One of the most common cases that lead to such a complex transfer history is redshirting, where a player sit out an entire year either intentionally to prolong their eligibility status or as a result of some extenuating circumstances, such as injuries and academics. Other issues that complicated our process of obtaining information on transfers include college players self-selecting to turn professional before their eligibility clock ends (such as "one-and-done"), and players transferring outside NCAA Division I, likely to lower divisions or junior colleges (including the so-called "4-2-4 pathway"), to gain additional experience and visibility before returning to the NCAA Division I tournaments. In the long term, a more organized data collection process is needed to capture college athletes' case-by-case use of their eligibility window.
 
--   Explore more ways to fit the model, such as using random slopes, GLMs and GAMs to capture non-linear relationships between variables to the outcome (points per game).
+Second, our data only contained information on the players' actual on-court performance, such as points per game and percentage of available minutes played, along with their name, school (team), position, and year in college. In reality, collegiate athletes can transfer for a multitude of reasons well beyond the scope of our data, such as proximity to home, academic and culture fits, academics, injuries, or coaching changes. One especially prominent motivation behind many collegiate athletics transfers in the 2022-2026 period was revenue from Name, Image, and Likeness (NIL), in which players can choose to sacrifice their athletic performance in exchange for a more prestigious brand name and higher visibility. The true amount of NIL money that each NCAA Division I men's basketball athlete receives has not been publicly disclosed, which becomes a perennial confounding variable in collegiate athletics research.
+
+**b) Model specifications**
+
+First, for the outcome variable, we used points per game (PPG) as an easily accessible and interpretable measure of player performance. Despite their advantages, it should not be regarded as an all-in-one metric to quantify a player's efficiency on the court, since PPG can be biased towards high playing time as well as certain positions and team strategies. We want to explore more advanced metrics, such as points per possession (PPP), Regularized Adjusted Plus-Minus (RAPM), or Points Over Replacement Per Adjusted Game At That Usage (PORPAGATU!), to obtain a more holistic overview of player performance. Another promising solution would be to replace a player's raw performance metrics, such as PPG, with their corresponding league percentile, adjusted for position and/or experience level.
+
+Second, when we examined the assumptions for our modeling through data visualizations in [Appendix 3](#appendix-3), we noticed that the matched data following the propensity score matching process displayed clear signs of heteroskedasticity. While this did not affect our estimated magnitude of the effects of transfers on player performance, it would affect the statistical significance of these estimates. We plan to address the issue in future versions of the project by replacing the current standard errors stated in the [Results](#results) section with the corresponding heteroskedasticity-robust standard errors.
+
+Finally, we also plan to explore more flexible model specifications, such as Generalized Linear Models (GLMs) and Generalized Additive Models (GAMs) to better capture non-linear relationships between a player's characteristics and their decision to transfer or their athletic performance. For instance, in the mixed effects model, we propose experimenting with tweedie regression if PPG is used as the outcome variable, as PPG across the league is highly right-skewed and some players have zero PPG. We may also add player-specific random slopes to account for players' varying changes in athletic performance following a transfer, especially for personal, non-athletic factors beyond the scope of our data.
 
 ## Acknowledgments
 
@@ -270,6 +278,20 @@ Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference,
 
 \[Fixed vs random effects model\]
 
-## Appendix 3: Balance diagnostics for propensity score matching {#appendix-3}
+## Appendix 3: Visual diagnostics of the models {#appendix-3}
 
-\[Show a table or Love plot: t-test - are the means for the control and treatment groups actually similar?\]
+**a) Balance diagnostics for the propensity score matching model**
+
+![Love Plot to Assess Propensity Score Matching Balance, All Transfers](Le/saved/love_plot_all.png){#fig-love-plot-all width="70%"}
+
+![Love Plot to Assess Propensity Score Matching Balance, Underperformer Transfers Only](Le/saved/love_plot_underperf.png){#fig-love-plot-underperf width="70%"}
+
+![Love Plot to Assess Propensity Score Matching Balance, Overperformer Transfers Only](Le/saved/love_plot_overperf.png){#fig-love-plot-overperf width="70%"}
+
+**b) Residuals versus fits plot for mixed effects regression models**
+
+![Residuals versus Fits Plot for Mixed Effects Model After Matching, All Transfers](Le/saved/fitted_vs_resid_normal.png){#fig-fitted-vs-resid-normal width="70%"}
+
+![Residuals versus Fits Plot for Mixed Effects Model After Matching, Underperformer Transfers Only](Le/saved/fitted_vs_resid_underperf.png){#fig-fitted-vs-resid-underperf width="70%"}
+
+![Residuals versus Fits Plot for Mixed Effects Model After Matching, Overperformer Transfers Only](Le/saved/fitted_vs_resid_overperf.png){#fig-fitted-vs-resid-overperf width="70%"}
