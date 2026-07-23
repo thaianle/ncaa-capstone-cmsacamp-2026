@@ -26,13 +26,13 @@ College Athletics in America is a multi-billion-dollar enterprise and is a cruci
 
 An enormous part of the NCAA is for a player's ability to transfer, or when the player decides to change what institution they attend and play for. This concept is not seen in many professional levels, and allows for the player to find the best fit academically, athletically, or personally. Transferring rules have changed drastically within the last decade. A simple timeline goes as follows ([Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15), [Yurko (2025)](https://www.youtube.com/watch?v=SdXpknMhGBc)):
 
-- 2018 - **launch of NCAA Transfer Portal** *"student athlete database compliance tool"*
+-   2018 - **launch of NCAA Transfer Portal** *"student athlete database compliance tool"*
 
-- 2020 - COVID-19 begins to impact college sports
+-   2020 - COVID-19 begins to impact college sports
 
-- 2021 - Student athletes allowed to **transfer once without sitting out a year** & **Name, Image, & Likeness (NIL)** era begins
+-   2021 - Student athletes allowed to **transfer once without sitting out a year** & **Name, Image, & Likeness (NIL)** era begins
 
-- 2024 - **Immediate eligibility no matter how many times athletes transferred**
+-   2024 - **Immediate eligibility no matter how many times athletes transferred**
 
 Due to these new rules, the number of athletes transferring increases each year. This new trend allows for new analysis of college sports.
 
@@ -40,9 +40,17 @@ Due to these new rules, the number of athletes transferring increases each year.
 
 A academic paper that provided a moderate framework for our research was [Cole et al. (2026)](https://doi.org/10.51221/sc.jiia.2026.19.1.15), titled *Big Fish or Little Pond? National Evidence on the Relationship Between Transferring and Athletic Performance Within Division I Men's College Basketball*. In this paper, player categories that could go unnoticed were highlighted and used as predictors. This included indicating if a player was an overperformer/underperformer and the size of program before and after the transfer. The big fish little pond effect was frequently referenced throughout the research process.
 
-Transferring has a huge impact on coaches, players, and programs as a whole. It allows for easier and quicker access for athletes to find a better fit, coaches to find a missing piece to their roster, and athletic departments to attract new talent to boost their reputation. The effects of transferring could be endless. One of these effects effects all three entities, players, coaches, and schools. What is the effects of transferring on a players performance?
+Transferring has a huge impact on coaches, players, and programs as a whole. It allows for easier and quicker access for athletes to find a better fit, coaches to find a missing piece to their roster, and athletic departments to attract new talent to boost their reputation. The effects of transferring could be endless. One of these effects impacts all three entities - players, coaches, and schools. What is the effect of transferring on a player's performance?
 
 ## Data
+
+For this particular research question, it was decided to analyze one specific sport in the NCAA. When choosing what sport, the availability of data, amount of data, popularity, and interpretability of sport were all considered. This led us to men's basketball, specifically at the divison I level. This is because men's basketball, in the NCAA, is ranked second in all of the following metrics:
+
+-   number of games in a season (2nd to women's softball)
+
+-   revenue generated (2nd to football)
+
+-   overall popularity (also 2nd to football)
 
 When it comes to the data used in our research, we used the `hoopR` R package part of the **SportsDataverse** ecosystem [(Gilani, 2026)](https://github.com/sportsdataverse/hoopR). Within this dataset, each observation is a player's season and their metrics for that season. This datasource is also publically available, making our code (link found under Contact Information and Code Availability section) entirely reproducible.
 
@@ -50,36 +58,32 @@ When it comes to the data used in our research, we used the `hoopR` R package pa
 
 A simplified example of what the overall structures of these datasets look like:
 
-|  Player   | Year |  Team  | PPG  | MPG  |
-|:---------:|:----:|:------:|:----:|:----:|
-| J. Broome | 2025 | Auburn | 18.6 | 30.2 |
-| L. Garza  | 2021 |  Iowa  | 24.1 | 31.5 |
-|  Z. Edey  | 2023 | Purdue | 22.3 | 31.7 |
-|  Z. Edey  | 2024 | Purdue | 25.2 | 32.0 |
-| C. Flagg  | 2025 |  Duke  | 19.2 | 31.3 |
+|  Player   | Year |  Team  | PPG  | Experience | Conference |
+|:---------:|:----:|:------:|:----:|:------------:|:----------:|
+| J. Broome | 2025 | Auburn | 18.6 | Super Senior | SEC | 
+| L. Garza  | 2021 |  Iowa  | 24.1 | Senior | B10 |
+|  Z. Edey  | 2023 | Purdue | 22.3 | Junior | B10 |
+|  Z. Edey  | 2024 | Purdue | 25.2 | Senior | B10 |
+| C. Flagg  | 2025 |  Duke  | 19.2 | Freshman | ACC |
 
-The data used only contains player demographics and metrics from seasons 2021-2026 (season is the year the championship for that season was played) as these are the years within the NIL era.
+The data used only contains player demographics and metrics from seasons 2021-2026 (season is the year the championship for that season was played). This is because these seasons occur after the NIL and immediate elibility after transfer ruling, which caused the first major spike in players transferring
 
-Regarding adding new features, two main types of new columns were made. This was because there are 2 different comparisons that were being made.
-
-- Comparing a player's metrics before and after their transfer
-
-- Comparing transfer players to non-transfer players
+Regarding creating new features, only one main column was constructed. This variable is called changed team and is the $Transferred$ indicator, showing if a row is/is not a year playing for a new school.
 
 So, columns indicating a if the player is a transfer for a certain year, if they have transferred before, and how many times they have transferred were added for insight on a player's career path. Along with this, features on a player's previous years metrics were used to see a difference in player's performance between years. A simplified example of what the overall structures of the datasets after adding these columns looks like:
 
-| Player | Year | Team | PPG | MPG | Changed Team | Has Transferred | Cumulative Career Transfers | Previous PPG | Previous MPG |
-|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:|
-| H. Dickinson | 2022 | Michigan | 18.6 | 32.6 | FALSE | FALSE | 0 | NA | NA |
-| H. Dickinson | 2023 | Michigan | 17.8 | 33.1 | FALSE | FALSE | 0 | 18.6 | 32.6 |
-| H. Dickinson | 2024 | Kansas | 17.9 | 29.8 | TRUE | TRUE | 1 | 17.8 | 33.1 |
-| H. Dickinson | 2025 | Kansas | 16.4 | 30.5 | FALSE | TRUE | 1 | 17.9 | 29.8 |
-| C. Love | 2022 | North Carolina | 16.1 | 33.2 | FALSE | FALSE | 0 | NA | NA |
-| C. Love | 2023 | North Carolina | 16.7 | 33.9 | FALSE | FALSE | 0 | 16.1 | 33.2 |
-| C. Love | 2024 | Arizona | 17.4 | 33.5 | TRUE | TRUE | 1 | 16.7 | 33.9 |
-| C. Love | 2025 | N.C. State | 18.0 | 34.1 | TRUE | TRUE | 2 | 17.4 | 33.5 |
+| Player | Year | Team | PPG | Experience | Conference | Team Rating | Conference Rating | Transferred |
+|:------:|:----:|:----:|:---:|:----------:|:------------:|:-----------:|:------:|:------:|:------:|
+| H. Dickinson | 2022 | Michigan | 18.6 | Sophomore | B10 | 0.874 | 0.804 | FALSE |
+| H. Dickinson | 2023 | Michigan | 17.8 | Junior | B10 | 0.832 | 0.811 | FALSE |
+| H. Dickinson | 2024 | Kansas | 17.9 | Senior | B12 | 0.8976 | 0.838 | TRUE |
+| H. Dickinson | 2025 | Kansas | 16.4 | Super Senior | B12 | 0.921 | 0.855 | FALSE |
+| C. Love | 2022 | North Carolina | 16.1 | Sophomore | ACC | 0.911 | 0.754 | FALSE |
+| C. Love | 2023 | North Carolina | 16.7 | Junior | ACC | 0.843 | 0.692 | FALSE |
+| C. Love | 2024 | Arizona | 17.4 | Senior | B12 | 0.950 | 0.763 | TRUE |
+| C. Love | 2025 | Arizona | 18.0 | Super Senior | B12 | 0.946 | 0.855 | FALSE |
 
-## Exploratory Data Analysis
+## Exploratory Data Analysis {#exploratory-data-analysis}
 
 **a) If a player is already performing well, they should not transfer**
 
@@ -87,11 +91,11 @@ So, columns indicating a if the player is a transfer for a certain year, if they
 
 Aspects of this graph:
 
-- Line y = x is the "line of equal return"
+-   Line y = x is the "line of equal return"
 
-- Trend line is the smoothed overall performance trend
+-   Trend line is the smoothed overall performance trend
 
-- Points only filtered to the top 90% of the data, so that players who get zero minutes or points don't affect the graph
+-   Points only filtered to the top 90% of the data, so that players who get zero minutes or points don't affect the graph
 
 On both plots, the trend line starts above y = x, but then intersects the line of equal return, and remains under that line for the rest of the plot. This shows that if a players points per game/minutes per game (PPG/MPG) the previous year is below the PPG/MPG at the point of intersection, the average player will have a higher PPG/MPG after their transfer than before their transfer. Reversely, if a player has a higher PPG/MPG in their previous year than the point of intersection, then the average player will have a lower PPG/MPG after their transfer than before their transfer. More simply, the better a player is, the harder it will be to match or surpass their previous PPG/MPG after a transfer. So, if a player is playing well, it is not advised to transfer.
 
@@ -101,11 +105,11 @@ On both plots, the trend line starts above y = x, but then intersects the line o
 
 Aspects of this graph:
 
-- X-axis is the category of experience or eligibility in the NCAA
+-   X-axis is the category of experience or eligibility in the NCAA
 
-- Y-axis is a the average points per game for the category
+-   Y-axis is a the average points per game for the category
 
-- Color is the transfer status of the players in each category
+-   Color is the transfer status of the players in each category
 
 From this, the pattern trend is that each line, for the most part, increases year over year. This accurately reflects the phenomenon where many players within the NCAA improve their performance when they gain more experience. This is similar to the relationship between performance and age in the NBA. However, age curves in the NBA display a peak at a certain age. In the NCAA, performance increases with experience, as most players hit a peak later in their career after their time in collegiate athletics. Another major trend in the graph is the never transferred (purple) line's separation from the lines that indicate a player has transferred or will transfer at least once. This inspired deep analysis on the difference in metrics between non-transfers and transfer athletes.
 
@@ -245,10 +249,10 @@ Finally, we also plan to explore more flexible model specifications, such as Gen
 
 We would like to give special thanks to:
 
-- **Professors Ron Yurko and Zach Branson**, who had offered us great guidance on the methodology for causal inference in sports,
-- **Katerina Wu and Lucca Ferraz** from the University of Pittsburgh Athletics, who provided invaluable data and domain knowledge,
-- **Sara Colando** and **Erin Franke**, the program instructors for their lectures,
-- **Princess Allotey**, **JungHo Lee**, and **Yuchen Chen**, the program's Teaching Assistants for their statistical expertise, their presence and willingness to help in the daily labs.
+-   **Professors Ron Yurko and Zach Branson**, who had offered us great guidance on the methodology for causal inference in sports,
+-   **Katerina Wu and Lucca Ferraz** from the University of Pittsburgh Athletics, who provided invaluable data and domain knowledge,
+-   **Sara Colando** and **Erin Franke**, the program instructors for their lectures,
+-   **Princess Allotey**, **JungHo Lee**, and **Yuchen Chen**, the program's Teaching Assistants for their statistical expertise, their presence and willingness to help in the daily labs.
 
 ## References
 
@@ -274,8 +278,8 @@ Yurko, R. (2025, September 27). *College Football Volatility: A Bayesian State-S
 
 We are happy to answer questions and receive feedback on the presentation of our capstone project. Here are our email information:
 
-- **An Le** (Bates College): [thaianle1102\@gmail.com](mailto:thaianle1102@gmail.com)
-- **Kendall Lucas** (Duquesne University): [kendalllucas724\@gmail.com](mailto:kendalllucas724@gmail.com)
+-   **An Le** (Bates College): [thaianle1102\@gmail.com](mailto:thaianle1102@gmail.com)
+-   **Kendall Lucas** (Duquesne University): [kendalllucas724\@gmail.com](mailto:kendalllucas724@gmail.com)
 
 All of our code are available on a public GitHub repository named [`ncaa-capstone-cmsacamp-2026`](https://github.com/thaianle/ncaa-capstone-cmsacamp-2026/tree/main).
 
@@ -285,13 +289,13 @@ All of our code are available on a public GitHub repository named [`ncaa-capston
 
 | Variable | Full name | Description and additional preprocessing |
 |------------------------|------------------------|------------------------|
-| $PPG$ | Points Per Game | Numeric Variable: The average number of points a player score in each game, or total points scored over the season divided by the total games played |
-| $Transferred$ | Year After Transfer | Logical Variable: Indicates if the player is a transfer. Transfer players are players who are new to a roster and came from a different school. 0 indicates the player is not a transfer and 1 indicates the player is a transfer|
+| $PPG$ | Points Per Game | Numeric Variable: The average number of points a player score in each game, or total points scored over the season divided by the total games played. |
+| $Transferred$ | Year After Transfer | Logical Variable: Indicates if the player is a transfer. Transfer players are players who are new to a roster and came from a different school. 0 indicates the player is not a transfer and 1 indicates the player is a transfer. |
 | $Position$ | Position | Categorical Variable: The groups of players that are best and used for a certain part of the game. Guards are often short and fast play-makers who excel in handling the ball and shooting. Forwards are more medium sized players who mainly play closer to the hoop but are also highly versatile. Lastly, Centers largest players who make short distance shots and block oppenents shots. |
-| $Experience$ | Experience Level or Class | Categorical Variable: Values are recoded from 1-5 instead of first years to super-seniors to reflect more of a number of season's played framework. |
-| $TeamRating$ | Team Rating | Numeric Variable; Barthag Rating Metric is a score a team recieves from a 0 to 1 scale. Essentially, this gives the probability that this team will beat the average team in Division I. |
-| $Conference$ | Conference | Categorical Variable; Conferences are groupings of schools with similar athletic funding budgets that play in a shared league. |
-| $ConfRating$ | Conference Rating | Numeric Variable; The Average Barthag Metric of all the schools inside corresponding conference. Also on a scale from 0 to 1. |
+| $Experience$ | Experience Level or Class | Categorical Variable: Values are recoded from 1-5 instead of first years to super-seniors to reflect more of a number of seasons played framework. |
+| $TeamRating$ | Team Rating | Numeric Variable: Barthag Rating Metric is a score a team recieves from a 0 to 1 scale. Essentially, this gives the probability that this team will beat the average team in Division I. |
+| $Conference$ | Conference | Categorical Variable: Conferences are groupings of schools with similar athletic funding budgets that play in a shared league. |
+| $ConfRating$ | Conference Rating | Numeric Variable: The Average Barthag Metric of all the schools inside corresponding conference. Also on a scale from 0 to 1. |
 
 Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference, and $t$ is the year.
 
