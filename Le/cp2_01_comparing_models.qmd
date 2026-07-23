@@ -160,6 +160,21 @@ models_mixed_summary <- modelsummary(models_mixed, stars = TRUE,
 models_mixed_summary
 ```
 
+#### Final ANOVA: are the random effects valid to be included in our model?
+
+```{r}
+test_lm <- lm(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                current_barthag + current_barthag_conf,
+              data = df)
+
+test_lmer <- lmer(ppg ~ changed_team + prev_ppg + pos + exp + year + conf +
+                    current_barthag + current_barthag_conf + (1|team:id),
+                  data = df, REML = FALSE)
+
+anova(test_lmer, test_lm)
+```
+
+
 #### Saving models and plots to make the final report or presentation cleaner
 
 Note that you need to create a folder in your working directory called `saved` for the code to be reproducible.
