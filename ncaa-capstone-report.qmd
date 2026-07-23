@@ -301,6 +301,16 @@ All of our code are available on a public GitHub repository named [`ncaa-capston
 
 \[Create a table with variable in mathematical equations (in the Methods section) and their detailed description, some data wrangling steps are important such as changing `exp` to a continuous scale of 1-5\]
 
+| Variable | Full name | Description and additional preprocessing |
+|------------------------|------------------------|------------------------|
+| $PPG$ | Points Per Game | Numeric Variable: The average number of points a player score in each game, or total points scored over the season divided by the total games played |
+| $Transferred$ | Year After Transfer | Logical Variable: Indicates if the player is a transfer. Transfer players are players who are new to a roster and came from a different school. 0 indicates the player is not a transfer and 1 indicates the player is a transfer|
+| $Position$ | Position | Categorical Variable: The groups of players that are best and used for a certain part of the game. Guards are often short and fast play-makers who excel in handling the ball and shooting. Forwards are more medium sized players who mainly play closer to the hoop but are also highly versatile. Lastly, Centers largest players who make short distance shots and block oppenents shots. |
+| $Experience$ | Experience Level or Class | Categorical Variable: Values are recoded from 1-5 instead of first years to super-seniors to reflect more of a number of season's played framework. |
+| $TeamRating$ | Team Rating | Numeric Variable; Barthag Rating Metric is a score a team recieves from a 0 to 1 scale. Essentially, this gives the probability that this team will beat the average team in Division I. |
+| $Conference$ | Conference | Categorical Variable; Conferences are groupings of schools with similar athletic funding budgets that play in a shared league. |
+| $ConfRating$ | Conference Rating | Numeric Variable; The Average Barthag Metric of all the schools inside corresponding conference. Also on a scale from 0 to 1. |
+
 Notation: $i$ is the individual athlete, $j$ is the team, $k$ is the conference, and $t$ is the year.
 
 ## Appendix 2: Model selection process for mixed effects regression {#appendix-2}
